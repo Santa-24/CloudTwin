@@ -79,6 +79,21 @@ class SimulationEngineAdapter:
             scenario_multiplier = 3.0
             scenario_name = "NAT Gateway & Egress Chokepoint"
 
+        # Apply custom parameter overrides if provided
+        if custom_params:
+            if "multiplier" in custom_params and custom_params["multiplier"]:
+                try:
+                    scenario_multiplier = float(custom_params["multiplier"])
+                    scenario_name = f"{scenario_multiplier}× Load Surge"
+                except (ValueError, TypeError):
+                    pass
+            if "scenario_name" in custom_params and custom_params["scenario_name"]:
+                scenario_name = str(custom_params["scenario_name"])
+            if "node_failure" in custom_params:
+                is_node_failure = bool(custom_params["node_failure"])
+            if "az_outage" in custom_params:
+                is_az_outage = bool(custom_params["az_outage"])
+
         bottlenecks: List[Bottleneck] = []
         scaling_reqs: List[ScalingRequirement] = []
         
@@ -219,10 +234,17 @@ class SimulationEngineAdapter:
 
         # Time series projection points for charts
         time_series: List[MetricPoint] = []
-        for minute in range(0, 16):
-            factor = (1.0 + (minute / 7.0) * (scenario_multiplier - 1.0)) if minute <= 8 else scenario_multiplier * (1.0 - (minute - 8) * 0.03)
+        duration_minutes = int(custom_params.get("duration_minutes", 15)) if custom_params else 15
+        duration_minutes = max(10, min(60, duration_minutes))
+        for minute in range(0, duration_minutes + 1):
+            mid_point = max(1, duration_minutes // 2)
+            if minute <= mid_point:
+                factor = 1.0 + (minute / float(mid_point)) * (scenario_multiplier - 1.0)
+            else:
+                factor = scenario_multiplier * max(0.6, 1.0 - ((minute - mid_point) / float(mid_point)) * 0.35)
             time_series.append(MetricPoint(
                 timestamp_sec=minute * 60,
+                time_offset_seconds=minute * 60,
                 requests_per_sec=round(baseline_rps * factor, 1),
                 latency_p95_ms=round(base_latency * (1.0 + (factor - 1.0) * 0.9), 1),
                 cpu_utilization_pct=round(min(99.0, max(20.0, cpu_load * (factor / max(scenario_multiplier, 0.1)))), 1),

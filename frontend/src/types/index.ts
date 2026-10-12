@@ -85,6 +85,7 @@ export interface SimulationScenario {
 
 export interface MetricPoint {
   timestamp_sec: number;
+  time_offset_seconds?: number;
   requests_per_sec: number;
   latency_p95_ms: number;
   cpu_utilization_pct: number;

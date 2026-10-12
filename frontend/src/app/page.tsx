@@ -107,7 +107,14 @@ export default function Home() {
                 },
                 bottlenecks: [],
                 scaling_requirements: [],
-                time_series_metrics: []
+                time_series_metrics: Array.from({ length: 16 }, (_, i) => ({
+                  timestamp_sec: i * 60,
+                  time_offset_seconds: i * 60,
+                  requests_per_sec: 1200 + Math.round(Math.sin(i / 2) * 80),
+                  latency_p95_ms: 38.4 + Math.round(Math.cos(i / 3) * 4),
+                  cpu_utilization_pct: 42.0 + Math.round(Math.sin(i / 2) * 6),
+                  error_rate_pct: 0.02
+                }))
               },
               cost: costData,
               security: secData,
@@ -159,11 +166,14 @@ export default function Home() {
     }
   };
 
-  const handleRunSimulation = async (scenarioId: string = 'scenario-traffic-10x') => {
+  const handleRunSimulation = async (
+    scenarioId: string = 'scenario-traffic-10x',
+    customParams: Record<string, any> = {}
+  ) => {
     if (!architecture) return;
     setIsSimulating(true);
     try {
-      const result = await api.runSimulation(architecture.id, scenarioId);
+      const result = await api.runSimulation(architecture.id, scenarioId, customParams);
       setAnalysisResult(result);
       setActiveTab('simulator');
     } catch (err: any) {
@@ -407,6 +417,7 @@ export default function Home() {
               isRunning={isSimulating}
               onExecuteSimulation={handleRunSimulation}
               currency={currency}
+              onNavigateToCanvas={() => setActiveTab('architectures')}
             />
           )}
 

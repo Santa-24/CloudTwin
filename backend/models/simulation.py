@@ -21,10 +21,15 @@ class SimulationRequest(BaseModel):
 
 class MetricPoint(BaseModel):
     timestamp_sec: int
+    time_offset_seconds: Optional[int] = None
     requests_per_sec: float
     latency_p95_ms: float
     cpu_utilization_pct: float
     error_rate_pct: float
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.time_offset_seconds is None:
+            self.time_offset_seconds = self.timestamp_sec
 
 class Bottleneck(BaseModel):
     resource_id: str
