@@ -15,22 +15,26 @@ import {
   Play,
   RotateCcw
 } from 'lucide-react';
-import { ViewMode } from '../../types';
-
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectView: (view: ViewMode) => void;
-  onRunSimulation: () => void;
-  onResetArchitecture: () => void;
-  onNewArchitecture: () => void;
+  onNavigate: (view: string) => void;
+  onRunSimulation?: (scenarioId?: string) => void;
+  onValidate?: () => void;
+  onNewProject?: () => void;
+  onGenerateReport?: () => void;
+  onResetArchitecture?: () => void;
+  onNewArchitecture?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isOpen,
   onClose,
-  onSelectView,
+  onNavigate,
   onRunSimulation,
+  onValidate,
+  onNewProject,
+  onGenerateReport,
   onResetArchitecture,
   onNewArchitecture
 }) => {
@@ -53,20 +57,22 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       group: 'Navigation',
       items: [
-        { id: 'nav-canvas', title: 'Go to Architecture Studio', icon: Layers, action: () => onSelectView('canvas'), hint: 'Studio' },
-        { id: 'nav-simulation', title: 'Go to What-If Simulator', icon: Activity, action: () => onSelectView('simulation'), hint: 'Chaos' },
-        { id: 'nav-cost', title: 'Go to Cost Intelligence', icon: Coins, action: () => onSelectView('cost'), hint: 'FinOps' },
-        { id: 'nav-security', title: 'Go to Security & Posture', icon: ShieldCheck, action: () => onSelectView('security'), hint: 'CIS' },
-        { id: 'nav-recommendations', title: 'Go to AI Optimizer', icon: Sparkles, action: () => onSelectView('recommendations'), hint: 'GenAI' },
-        { id: 'nav-reports', title: 'Go to Reports & Audits', icon: FileText, action: () => onSelectView('reports'), hint: 'Audit' },
+        { id: 'nav-overview', title: 'Go to Cloud Twin Dashboard', icon: Layers, action: () => onNavigate('overview'), hint: 'Home' },
+        { id: 'nav-canvas', title: 'Go to Architecture Studio', icon: Layers, action: () => onNavigate('canvas'), hint: 'Studio' },
+        { id: 'nav-simulation', title: 'Go to What-If Simulator', icon: Activity, action: () => onNavigate('simulation'), hint: 'Chaos' },
+        { id: 'nav-cost', title: 'Go to Cost Intelligence', icon: Coins, action: () => onNavigate('cost'), hint: 'FinOps' },
+        { id: 'nav-security', title: 'Go to Security & Posture', icon: ShieldCheck, action: () => onNavigate('security'), hint: 'CIS' },
+        { id: 'nav-recommendations', title: 'Go to AI Optimizer', icon: Sparkles, action: () => onNavigate('recommendations'), hint: 'GenAI' },
+        { id: 'nav-reports', title: 'Go to Reports & Audits', icon: FileText, action: () => onNavigate('reports'), hint: 'Audit' },
       ]
     },
     {
       group: 'Architecture Actions',
       items: [
-        { id: 'act-sim', title: 'Execute What-If Simulation Run', icon: Play, action: onRunSimulation, hint: 'Run' },
-        { id: 'act-reset', title: 'Reset Topology to AWS Reference', icon: RotateCcw, action: onResetArchitecture, hint: 'Reset' },
-        { id: 'act-new', title: 'Initialize Clean Blueprint', icon: Plus, action: onNewArchitecture, hint: 'New' },
+        { id: 'act-sim', title: 'Execute What-If Simulation Run', icon: Play, action: () => onRunSimulation && onRunSimulation(), hint: 'Run' },
+        { id: 'act-val', title: 'Run Architecture Rule Validation', icon: ShieldCheck, action: () => onValidate && onValidate(), hint: 'Audit' },
+        { id: 'act-rep', title: 'Generate Audit Report', icon: FileText, action: () => onGenerateReport && onGenerateReport(), hint: 'Report' },
+        { id: 'act-new', title: 'Initialize New Project Blueprint', icon: Plus, action: () => onNewProject ? onNewProject() : (onNewArchitecture && onNewArchitecture()), hint: 'New' },
       ]
     }
   ];
