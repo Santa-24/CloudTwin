@@ -24,6 +24,7 @@ interface AuthModalProps {
   onSignup: (email: string, pass: string, name: string) => Promise<void>;
   onGuestDemo: () => Promise<void>;
   onLogout: () => void;
+  initialMode?: 'login' | 'signup' | 'forgot';
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -33,15 +34,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLogin,
   onSignup,
   onGuestDemo,
-  onLogout
+  onLogout,
+  initialMode = 'login'
 }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (initialMode) {
+      setMode(initialMode);
+    }
+    setErrorMsg(null);
+    setSuccessMsg(null);
+  }, [initialMode, isOpen]);
 
   if (!isOpen) return null;
 

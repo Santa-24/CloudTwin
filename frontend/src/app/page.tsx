@@ -35,6 +35,7 @@ export default function Home() {
   // Modals
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -250,32 +251,65 @@ export default function Home() {
     const res = await api.login(e, p);
     localStorage.setItem('cloudtwin_token', res.access_token);
     setUser(res.user);
+    setInStudio(true);
+    setAuthModalOpen(false);
   };
 
   const handleSignup = async (e: string, p: string, n: string) => {
     const res = await api.signup(e, p, n);
     localStorage.setItem('cloudtwin_token', res.access_token);
     setUser(res.user);
+    setInStudio(true);
+    setAuthModalOpen(false);
   };
 
   const handleGuestDemo = async () => {
     const res = await api.guestLogin();
     localStorage.setItem('cloudtwin_token', res.access_token);
     setUser(res.user);
+    setInStudio(true);
+    setAuthModalOpen(false);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('cloudtwin_token');
     setUser(null);
+    setInStudio(false);
+    setAuthModalOpen(false);
+  };
+
+  const handleEnterStudio = () => {
+    if (!user) {
+      setAuthMode('login');
+      setAuthModalOpen(true);
+      return;
+    }
+    setInStudio(true);
   };
 
   // Render Landing Page if not in studio
   if (!inStudio) {
     return (
-      <LandingPage 
-        onEnterStudio={() => setInStudio(true)} 
-        onOpenAuth={() => setAuthModalOpen(true)} 
-      />
+      <>
+        <LandingPage 
+          onEnterStudio={handleEnterStudio} 
+          onOpenAuth={(mode) => {
+            setAuthMode(mode || 'login');
+            setAuthModalOpen(true);
+          }}
+          user={user}
+        />
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          currentUser={user}
+          onLogin={handleLogin}
+          onSignup={handleSignup}
+          onGuestDemo={handleGuestDemo}
+          onLogout={handleLogout}
+          initialMode={authMode}
+        />
+      </>
     );
   }
 
@@ -449,6 +483,7 @@ export default function Home() {
         onSignup={handleSignup}
         onGuestDemo={handleGuestDemo}
         onLogout={handleLogout}
+        initialMode={authMode}
       />
 
       <VersionHistoryModal

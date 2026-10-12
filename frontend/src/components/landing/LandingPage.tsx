@@ -31,13 +31,15 @@ import {
   TrendingDown,
   RefreshCw
 } from 'lucide-react';
+import { UserProfile } from '../../types';
 
 interface LandingPageProps {
   onEnterStudio: () => void;
-  onOpenAuth: () => void;
+  onOpenAuth: (mode?: 'login' | 'signup') => void;
+  user?: UserProfile | null;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onEnterStudio, onOpenAuth }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onEnterStudio, onOpenAuth, user }) => {
   // Interactive Simulation Sandbox State on Landing Page
   const [activeScenario, setActiveScenario] = useState<'normal' | 'surge' | 'az_outage' | 'failover'>('normal');
   const [simulationMetrics, setSimulationMetrics] = useState({
@@ -128,21 +130,43 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterStudio, onOpenA
           <a href="#testimonials" className="hover:text-amber-700 transition-colors">Architect Reviews</a>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onOpenAuth}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors border border-slate-200"
-          >
-            Sign In / Register
-          </button>
-          <button
-            onClick={onEnterStudio}
-            className="relative group overflow-hidden flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02]"
-          >
-            <div className="absolute inset-0 w-full h-full awwwards-shimmer opacity-30 pointer-events-none" />
-            <span className="font-mono uppercase tracking-wider text-[11px]">Enter Studio</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex items-center gap-2.5">
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline-block text-xs font-semibold text-slate-700">
+                {user.full_name}
+              </span>
+              <button
+                onClick={onEnterStudio}
+                className="relative group overflow-hidden flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02]"
+              >
+                <span className="font-mono uppercase tracking-wider text-[11px]">Go to Studio</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => onOpenAuth('login')}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors border border-slate-200"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => onOpenAuth('signup')}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-sm"
+              >
+                Register
+              </button>
+              <button
+                onClick={onEnterStudio}
+                className="hidden sm:flex relative group overflow-hidden items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all"
+              >
+                <span className="font-mono uppercase tracking-wider text-[10px]">Enter Studio</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -171,17 +195,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterStudio, onOpenA
           >
             <div className="absolute inset-0 w-full h-full awwwards-shimmer opacity-30 pointer-events-none" />
             <Workflow className="w-4 h-4" />
-            <span className="font-mono uppercase tracking-wider text-xs font-extrabold">Launch Digital Twin Workspace</span>
+            <span className="font-mono uppercase tracking-wider text-xs font-extrabold">{user ? 'Launch Digital Twin Workspace' : 'Enter Studio (Sign In / Register)'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
-          <button
-            onClick={onOpenAuth}
-            className="flex items-center gap-2.5 px-7 py-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold font-mono tracking-wide transition-all shadow-xs"
-          >
-            <Lock className="w-3.5 h-3.5 text-amber-600" />
-            <span>Create Independent Account</span>
-          </button>
+          {!user && (
+            <button
+              onClick={() => onOpenAuth('signup')}
+              className="flex items-center gap-2.5 px-7 py-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold font-mono tracking-wide transition-all shadow-xs"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Create Independent Account</span>
+            </button>
+          )}
         </div>
 
         {/* Live Badges Row */}
@@ -666,12 +692,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterStudio, onOpenA
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <button
-                onClick={onOpenAuth}
-                className="px-6 py-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-mono font-bold transition-all shadow-xs"
-              >
-                Sign In / Register
-              </button>
+              {!user && (
+                <>
+                  <button
+                    onClick={() => onOpenAuth('login')}
+                    className="px-6 py-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-mono font-bold transition-all shadow-xs"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => onOpenAuth('signup')}
+                    className="px-6 py-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-mono font-bold transition-all shadow-md shadow-amber-500/20"
+                  >
+                    Register
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
