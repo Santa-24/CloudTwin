@@ -35,11 +35,16 @@ class Bottleneck(BaseModel):
     resource_id: str
     resource_name: str
     component_type: str
+    component_name: Optional[str] = None
     metric: str
     threshold_value: float
     observed_value: float
     severity: str  # CRITICAL, HIGH, MEDIUM
     summary: str
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.component_name is None:
+            self.component_name = self.resource_name
 
 class ScalingRequirement(BaseModel):
     resource_id: str

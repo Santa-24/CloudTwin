@@ -68,7 +68,7 @@ class RecommendationEngineAdapter:
         import json
         nodes_desc = ", ".join([f"{n.name} ({n.type})" for n in architecture.nodes]) or "No nodes"
         findings_desc = ", ".join([f.title for f in security.findings]) if security and security.findings else "None"
-        bottlenecks_desc = ", ".join([b.component_name for b in simulation.bottlenecks]) if simulation and simulation.bottlenecks else "None"
+        bottlenecks_desc = ", ".join([b.resource_name for b in simulation.bottlenecks]) if simulation and simulation.bottlenecks else "None"
 
         prompt = f"""You are a Principal AWS Solutions Architect. Analyze the following AWS Cloud Digital Twin architecture:
 - Architecture Name: {architecture.name}

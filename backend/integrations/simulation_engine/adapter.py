@@ -44,7 +44,7 @@ class SimulationEngineAdapter:
         # Canonical built-in simulation engine fallback
         return self._execute_canonical_simulation(architecture, scenario_id, custom_params or {})
 
-    def _execute_canonical_simulation(self, architecture: ArchitectureSchema, scenario_id: str, params: Dict[str, Any]) -> SimulationResult:
+    def _execute_canonical_simulation(self, architecture: ArchitectureSchema, scenario_id: str, custom_params: Dict[str, Any] = None) -> SimulationResult:
         """
         High-fidelity canonical simulation calculation based on graph topology,
         component counts, bandwidth capacity, and failure injects.
