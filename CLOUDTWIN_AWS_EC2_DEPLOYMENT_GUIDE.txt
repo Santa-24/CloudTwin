@@ -206,33 +206,46 @@ Security Group:
 
 ================================================================================
 ================================================================================
-5. STEP 3: CONNECT TO EC2 (BROWSER INSTANCE CONNECT OR SSH)
+5. STEP 3: CONNECT TO EC2 (RECOMMENDED: 1-CLICK AWS CONSOLE BROWSER TERMINAL)
 ================================================================================
 
 --------------------------------------------------------------------------------
-OPTION A: AWS CONSOLE "EC2 INSTANCE CONNECT" (1-CLICK IN BROWSER — FASTEST)
+OPTION A: AWS CONSOLE "EC2 INSTANCE CONNECT" (RECOMMENDED — NO PEM KEY REQUIRED!)
 --------------------------------------------------------------------------------
-1. In the EC2 Console -> Click "Instances" in the left menu.
-2. Select your `CloudTwin-Production` instance checkbox.
-3. Click the "Connect" button at the top.
-4. Keep the default tab: "EC2 Instance Connect".
+This is the easiest, zero-friction method on Windows. You DO NOT need to configure 
+SSH keys, `.pem` files, or worry about Windows `chmod` permission errors!
+
+1. In the AWS EC2 Console, click "Instances" in the left menu.
+2. Click to check the box next to your instance `CloudTwin-Production`.
+3. Click the white "Connect" button at the top of the screen.
+4. Keep the first tab selected: "EC2 Instance Connect".
 5. User name: `ubuntu` (pre-filled).
 6. Click the orange "Connect" button at the bottom right.
-7. A browser terminal window opens immediately with:
-   `ubuntu@ip-10-0-x-x:~$` (You are ready to run commands!).
+7. A new browser tab opens with an active, secure Linux terminal:
+   `ubuntu@ip-10-0-9-85:~$ `
+   (You are already inside your EC2 server! Run all subsequent commands here).
 
 --------------------------------------------------------------------------------
-OPTION B: CONNECT VIA SSH (WINDOWS POWERSHELL & MACOS/LINUX)
+OPTION B: CONNECT VIA WINDOWS POWERSHELL / SSH (OPTIONAL)
 --------------------------------------------------------------------------------
-1. Navigate to the folder containing your downloaded `cloudtwin-key.pem`:
+*NOTE: On Windows, `chmod` does NOT work and returns 'Permission denied' because*
+*Windows uses NTFS access control lists (ACLs). If using PowerShell, use `icacls`:*
+
+1. Open PowerShell and navigate to your Downloads folder:
    ```powershell
    cd C:\Users\santa\Downloads
    ```
-2. (macOS/Linux only): `chmod 400 cloudtwin-key.pem`
+2. Remove inherited Windows permissions on `cloudtwin.pem`:
+   ```powershell
+   icacls.exe cloudtwin.pem /reset
+   icacls.exe cloudtwin.pem /grant:r "$($env:username):(R)"
+   icacls.exe cloudtwin.pem /inheritance:r
+   ```
 3. Connect using SSH:
    ```powershell
-   ssh -i "cloudtwin-key.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
+   ssh -i "cloudtwin.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
    ```
+   *(Or on macOS/Linux: `chmod 400 cloudtwin.pem && ssh -i cloudtwin.pem ubuntu@<IP>`)*.
 
 
 ================================================================================
