@@ -205,40 +205,34 @@ Security Group:
 
 
 ================================================================================
-5. STEP 3: CONNECT TO EC2 VIA SSH (WINDOWS POWERSHELL & MACOS/LINUX)
+================================================================================
+5. STEP 3: CONNECT TO EC2 (BROWSER INSTANCE CONNECT OR SSH)
 ================================================================================
 
-Step 3.1: Locate Key Pair File
-Open PowerShell (on Windows) or Terminal (on macOS/Linux):
+--------------------------------------------------------------------------------
+OPTION A: AWS CONSOLE "EC2 INSTANCE CONNECT" (1-CLICK IN BROWSER — FASTEST)
+--------------------------------------------------------------------------------
+1. In the EC2 Console -> Click "Instances" in the left menu.
+2. Select your `CloudTwin-Production` instance checkbox.
+3. Click the "Connect" button at the top.
+4. Keep the default tab: "EC2 Instance Connect".
+5. User name: `ubuntu` (pre-filled).
+6. Click the orange "Connect" button at the bottom right.
+7. A browser terminal window opens immediately with:
+   `ubuntu@ip-10-0-x-x:~$` (You are ready to run commands!).
 
+--------------------------------------------------------------------------------
+OPTION B: CONNECT VIA SSH (WINDOWS POWERSHELL & MACOS/LINUX)
+--------------------------------------------------------------------------------
 1. Navigate to the folder containing your downloaded `cloudtwin-key.pem`:
    ```powershell
-   # Windows PowerShell:
    cd C:\Users\santa\Downloads
    ```
-   *(Or wherever your key is located)*.
-
-Step 3.2: Set Key Permissions (Linux / macOS only)
-If using Linux or macOS:
-```bash
-chmod 400 cloudtwin-key.pem
-```
-
-Step 3.3: Initiate SSH Connection
-Replace `<YOUR_EC2_PUBLIC_IP>` with the public IP of your instance from Step 1:
-```powershell
-ssh -i "cloudtwin-key.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
-```
-*(Example: `ssh -i "cloudtwin-key.pem" ubuntu@13.232.89.144`)*
-
-Step 3.4: Confirm Fingerprint
-When you see the message:
-`The authenticity of host '...' can't be established. Are you sure you want to continue connecting (yes/no/[fingerprint])?`
-- Type: `yes`
-- Press: Enter
-
-You are now logged in! Your terminal prompt will change to:
-`ubuntu@ip-10-0-x-x:~$`
+2. (macOS/Linux only): `chmod 400 cloudtwin-key.pem`
+3. Connect using SSH:
+   ```powershell
+   ssh -i "cloudtwin-key.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
+   ```
 
 
 ================================================================================
@@ -246,11 +240,11 @@ You are now logged in! Your terminal prompt will change to:
 ================================================================================
 
 CloudTwin includes an automated server setup script in `infrastructure/deployment/setup-ec2.sh`.
-Run these commands in your SSH terminal:
+Run these commands in your EC2 terminal window:
 
 Step 4.1: Clone the CloudTwin Repository
 ```bash
-git clone https://github.com/<YOUR_GITHUB_USERNAME>/CloudTwin.git
+git clone https://github.com/Santa-24/CloudTwin.git
 cd CloudTwin
 ```
 
