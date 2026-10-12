@@ -1,50 +1,50 @@
 #!/bin/bash
 # ==============================================================================
-# CloudTwin Platform — Free Automated HTTPS / SSL Setup (Let's Encrypt & Nginx)
+# CloudTwin Platform — Production HTTPS & SSL Automated Setup (Let's Encrypt)
 # ==============================================================================
-# This script provisions a free SSL certificate for your CloudTwin subdomain
-# (e.g. from DuckDNS: yourname.duckdns.org, or any custom domain).
+# Target Domain: cloudtwin.duckdns.org (or custom domain)
 # ==============================================================================
 set -e
 
-DOMAIN=$1
-EMAIL=$2
+DOMAIN="${1:-cloudtwin.duckdns.org}"
+EMAIL="${2:-admin@cloudtwin.io}"
 
-if [ -z "$DOMAIN" ]; then
-    echo "================================================================="
-    echo " CloudTwin HTTPS & Subdomain Provisioning Setup"
-    echo "================================================================="
-    echo "Tip: You can use a 100% free DuckDNS subdomain (e.g. cloudtwin-santosh.duckdns.org)"
-    echo "pointing to your EC2 IP (13.127.253.31), or your own domain name."
-    echo ""
-    read -p "Enter your domain / subdomain (e.g., cloudtwin.duckdns.org): " DOMAIN
-fi
+echo "================================================================="
+echo " Configuring HTTPS for: $DOMAIN"
+echo " Contact Email:         $EMAIL"
+echo "================================================================="
 
-if [ -z "$EMAIL" ]; then
-    read -p "Enter your email for Let's Encrypt renewal alerts: " EMAIL
-fi
-
-if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
-    echo "Error: Domain and Email are required to provision SSL."
-    exit 1
-fi
-
+# 1. Temporarily stop Nginx so Certbot standalone can bind to port 80
 echo ""
-echo "=== Step 1: Requesting Let's Encrypt SSL Certificate for $DOMAIN ==="
+echo "=== Step 1: Temporarily stopping Nginx container for ACME challenge ==="
+docker compose -f infrastructure/docker/docker-compose.prod.yml stop nginx || true
 
-# Obtain certificate using certbot container
-docker run -it --rm --name certbot \
-    -v "docker_certbot_etc:/etc/letsencrypt" \
-    -v "docker_certbot_var:/var/lib/letsencrypt" \
-    -v "docker_certbot_www:/var/www/certbot" \
-    certbot/certbot certonly --webroot \
-    --webroot-path=/var/www/certbot \
-    --email "$EMAIL" --agree-tos --no-eff-email \
-    -d "$DOMAIN"
-
+# 2. Ensure Certbot is installed on the host
 echo ""
-echo "=== Step 2: Configuring Nginx with TLS 1.3 & HTTP->HTTPS Redirection ==="
+echo "=== Step 2: Installing Certbot on host ==="
+sudo apt-get update -y
+sudo apt-get install -y certbot
 
+# 3. Request Let's Encrypt SSL Certificate
+echo ""
+echo "=== Step 3: Requesting Let's Encrypt SSL Certificate for $DOMAIN ==="
+sudo certbot certonly --standalone \
+    -d "$DOMAIN" \
+    --email "$EMAIL" \
+    --agree-tos \
+    --no-eff-email \
+    --non-interactive \
+    --keep-until-expiring
+
+# 4. Set directory permissions so Nginx container can read certificate keys
+echo ""
+echo "=== Step 4: Setting certificate read permissions ==="
+sudo chmod -R 755 /etc/letsencrypt/live/
+sudo chmod -R 755 /etc/letsencrypt/archive/
+
+# 5. Generate Production HTTPS Nginx Configuration
+echo ""
+echo "=== Step 5: Generating HTTPS Nginx Configuration ==="
 cat <<EOF > infrastructure/docker/nginx.conf
 events {
     worker_connections 1024;
@@ -71,7 +71,7 @@ http {
     # Redirect all HTTP (port 80) to HTTPS (port 443)
     server {
         listen 80;
-        server_name $DOMAIN;
+        server_name $DOMAIN localhost 13.127.253.31;
 
         location /.well-known/acme-challenge/ {
             root /var/www/certbot;
@@ -85,12 +85,12 @@ http {
     # Secure HTTPS Server
     server {
         listen 443 ssl http2;
-        server_name $DOMAIN;
+        server_name $DOMAIN localhost;
 
         ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
         ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-        # Modern SSL configuration (A+ rating)
+        # Modern SSL configuration
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
         ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
@@ -103,7 +103,6 @@ http {
         add_header X-XSS-Protection "1; mode=block" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Content-Security-Policy "upgrade-insecure-requests; default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;" always;
 
         client_max_body_size 25M;
 
@@ -150,12 +149,14 @@ http {
 }
 EOF
 
+# 6. Start Nginx with new SSL config
 echo ""
-echo "=== Step 3: Reloading Nginx Container ==="
-docker compose -f infrastructure/docker/docker-compose.prod.yml restart nginx
+echo "=== Step 6: Starting Nginx Container with SSL enabled ==="
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d nginx
 
 echo ""
 echo "================================================================="
 echo " SUCCESS! CloudTwin is now live over HTTPS!"
-echo " Access URL: https://$DOMAIN"
+echo " Secure URL: https://$DOMAIN/"
+echo " API Health: https://$DOMAIN/api/health"
 echo "================================================================="

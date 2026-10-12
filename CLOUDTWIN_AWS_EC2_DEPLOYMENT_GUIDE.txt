@@ -438,35 +438,45 @@ THE CLOUDTWIN PLATFORM IS NOW FULLY LIVE ON THE PUBLIC INTERNET!
 
 
 ================================================================================
-10. STEP 8: (OPTIONAL) DOMAIN NAME DNS & FREE LET'S ENCRYPT SSL SETUP
+10. STEP 8: HTTPS & FREE LET'S ENCRYPT SSL SETUP (cloudtwin.duckdns.org)
 ================================================================================
 
-If you own a custom domain (e.g., `cloudtwin.io` or `app.yourdomain.com`):
+CloudTwin includes automated Let's Encrypt SSL provisioning and Nginx TLS 1.3
+configuration for `cloudtwin.duckdns.org` (or any custom domain).
 
-Step 8.1: Point DNS A Record
-- Log in to your DNS provider (Route 53, Cloudflare, GoDaddy, Namecheap).
-- Create an `A` record:
-  * Name: `@` OR `app` (e.g. `app.yourdomain.com`)
-  * Type: `A`
-  * Value / Target: `<YOUR_ELASTIC_IP>`
-  * TTL: `300` (5 minutes)
+Step 8.1: Point DuckDNS Subdomain to EC2 IP
+1. Log in to https://www.duckdns.org (Sign in with Google / GitHub).
+2. Under "sub domains", type: `cloudtwin` (so the domain is `cloudtwin.duckdns.org`).
+3. Set the IP address to your EC2 Public IP: `13.127.253.31`
+4. Click "update ip".
 
-Step 8.2: Obtain Free Let's Encrypt SSL Certificate
-Run in your EC2 SSH session:
+Step 8.2: Ensure Port 443 (HTTPS) is Open in AWS EC2 Security Group
+1. Open EC2 Console -> Instances -> Click `CloudTwin-Production`.
+2. Click the "Security" tab -> Click your Security Group (e.g. `launch-wizard-1` or `cloudtwin-ec2-sg`).
+3. In "Inbound rules", confirm:
+   - Port 80 (HTTP) -> 0.0.0.0/0
+   - Port 443 (HTTPS) -> 0.0.0.0/0
+   - Port 22 (SSH) -> 0.0.0.0/0 (or your IP)
+   *(If Port 443 is missing, click "Edit inbound rules" -> "Add rule" -> Type: HTTPS -> Source: Anywhere-IPv4 -> Save).*
+
+Step 8.3: Run Automated SSL Setup Script on EC2
+In your EC2 terminal, run:
 ```bash
-# 1. Stop Nginx temporarily to release port 80
-docker compose -f infrastructure/docker/docker-compose.prod.yml stop nginx
+# 1. Pull latest code
+cd ~/CloudTwin
+git pull origin main
 
-# 2. Install Certbot
-sudo apt-get update -y
-sudo apt-get install -y certbot
-
-# 3. Generate certificate
-sudo certbot certonly --standalone -d app.yourdomain.com
-
-# 4. Restart containers
-docker compose -f infrastructure/docker/docker-compose.prod.yml start nginx
+# 2. Make script executable and run with your domain & email
+chmod +x infrastructure/deployment/setup-ssl.sh
+./infrastructure/deployment/setup-ssl.sh cloudtwin.duckdns.org your-email@gmail.com
 ```
+
+Step 8.4: Verification
+Open your browser and visit:
+https://cloudtwin.duckdns.org/
+
+All browser insecure blob warnings are completely eliminated, and CloudTwin
+is secured with modern TLS 1.3 encryption!
 
 
 ================================================================================
