@@ -15,7 +15,8 @@ import {
   Flame,
   Radio,
   Cpu,
-  Globe
+  Globe,
+  X
 } from 'lucide-react';
 import { Project, UserProfile } from '../../types';
 
@@ -29,6 +30,8 @@ interface SidebarProps {
   user: UserProfile | null;
   onOpenAuth: () => void;
   onReturnToLanding?: () => void;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -40,7 +43,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenCommandPalette,
   user,
   onOpenAuth,
-  onReturnToLanding
+  onReturnToLanding,
+  isOpenMobile = false,
+  onCloseMobile
 }) => {
   const [projectDropdownOpen, setProjectDropdownOpen] = React.useState(false);
 
@@ -57,26 +62,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 h-screen flex flex-col bg-white/95 backdrop-blur-xl border-r border-slate-200/90 select-none z-30 shrink-0 shadow-[2px_0_12px_rgba(0,0,0,0.02)]">
-      {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-5 border-b border-slate-200/80">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('overview')}>
-          <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 flex items-center justify-center shadow-md shadow-amber-500/20 border border-amber-300 group">
-            <div className="w-3.5 h-3.5 rounded-sm border-2 border-white rotate-45 flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+    <>
+      {isOpenMobile && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-30 md:hidden animate-in fade-in duration-150"
+          onClick={onCloseMobile}
+        />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 md:static md:h-screen flex flex-col bg-white/95 backdrop-blur-xl border-r border-slate-200/90 select-none shrink-0 shadow-2xl md:shadow-[2px_0_12px_rgba(0,0,0,0.02)] transition-transform duration-200 ease-in-out ${isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        {/* Brand Header */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-200/80">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setActiveTab('overview'); if (onCloseMobile) onCloseMobile(); }}>
+            <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 flex items-center justify-center shadow-md shadow-amber-500/20 border border-amber-300 group">
+              <div className="w-3.5 h-3.5 rounded-sm border-2 border-white rotate-45 flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold tracking-tight text-slate-900 text-base">CloudTwin</span>
+                <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-semibold">
+                  v2.3
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono tracking-wider uppercase font-semibold">AWS DIGITAL TWIN</p>
             </div>
           </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold tracking-tight text-slate-900 text-base">CloudTwin</span>
-              <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-semibold">
-                v2.3
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 font-mono tracking-wider uppercase font-semibold">AWS DIGITAL TWIN</p>
-          </div>
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Close Navigation"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-      </div>
 
       {/* Project Switcher Bar */}
       <div className="px-3 pt-3 pb-1 relative">
@@ -199,5 +220,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+    </>
   );
 };

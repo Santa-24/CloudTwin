@@ -8,7 +8,8 @@ import {
   Globe, 
   Sparkles,
   Zap,
-  Activity
+  Activity,
+  Menu
 } from 'lucide-react';
 import { ArchitectureSchema, Project } from '../../types';
 
@@ -22,6 +23,7 @@ interface HeaderProps {
   isValidating: boolean;
   onValidate: () => void;
   onReturnToLanding?: () => void;
+  onToggleMobileSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,13 +35,23 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCommandPalette,
   isValidating,
   onValidate,
-  onReturnToLanding
+  onReturnToLanding,
+  onToggleMobileSidebar
 }) => {
   return (
-    <header className="h-16 px-6 flex items-center justify-between bg-white/90 backdrop-blur-xl border-b border-slate-200/90 shrink-0 z-20 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+    <header className="h-16 px-4 md:px-6 flex items-center justify-between bg-white/90 backdrop-blur-xl border-b border-slate-200/90 shrink-0 z-20 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
       {/* Left: Breadcrumbs & Twin Meta */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-2 md:gap-3 min-w-0">
+        {onToggleMobileSidebar && (
+          <button
+            onClick={onToggleMobileSidebar}
+            className="md:hidden p-1.5 -ml-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+            title="Toggle Menu"
+          >
+            <Menu className="w-5 h-5 text-slate-700" />
+          </button>
+        )}
+        <div className="flex items-center gap-2 text-xs truncate">
           <span className="text-slate-500 font-medium tracking-wide">{currentProject?.name || 'FinTech Project'}</span>
           <span className="text-slate-300 font-light">/</span>
           <span className="font-bold text-slate-900 flex items-center gap-2">

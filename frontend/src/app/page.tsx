@@ -36,6 +36,7 @@ export default function Home() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Currency
   const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
@@ -297,6 +298,8 @@ export default function Home() {
         user={user}
         onOpenAuth={() => setAuthModalOpen(true)}
         onReturnToLanding={() => setInStudio(false)}
+        isOpenMobile={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
       {/* Main Studio Viewport */}
@@ -311,6 +314,7 @@ export default function Home() {
           isValidating={isValidating}
           onValidate={handleValidate}
           onReturnToLanding={() => setInStudio(false)}
+          onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         />
 
         {/* Dynamic Route View */}
