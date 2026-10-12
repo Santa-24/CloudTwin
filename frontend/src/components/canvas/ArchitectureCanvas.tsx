@@ -59,6 +59,8 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const hasModifiedRef = React.useRef(false);
+  const isSavingRef = React.useRef(false);
 
   // Convert canonical schema nodes to React Flow nodes
   const initialNodes: Node[] = useMemo(() => {
@@ -101,6 +103,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
   // Connect handler
   const onConnect = useCallback((params: Connection) => {
+    hasModifiedRef.current = true;
     setEdges((eds) => addEdge({
       ...params,
       animated: true,
@@ -166,10 +169,12 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
     };
     setNodes((nds) => [...nds, newNode]);
     setSelectedNodeId(id);
+    hasModifiedRef.current = true;
   };
 
   // Update node config from Inspector
   const handleUpdateNode = (nodeId: string, updates: Partial<ArchitectureNode>) => {
+    hasModifiedRef.current = true;
     setNodes((nds) => nds.map((n) => {
       if (n.id === nodeId) {
         return {
@@ -190,6 +195,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
   // Delete node
   const handleDeleteNode = (nodeId: string) => {
+    hasModifiedRef.current = true;
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
     setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
     if (selectedNodeId === nodeId) {
@@ -199,6 +205,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
   // Hierarchical auto-layout
   const handleAutoLayout = () => {
+    hasModifiedRef.current = true;
     const layerOrder: Record<string, number> = {
       CLOUDFRONT: 0,
       ROUTE53: 0,
@@ -245,36 +252,52 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
   // Canonical Save
   const handleSave = async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     setIsSaving(true);
-    const canonicalNodes: ArchitectureNode[] = nodes.map((n) => ({
-      id: n.id,
-      name: (n.data as any).name,
-      type: (n.data as any).type,
-      category: (n.data as any).category,
-      position: n.position,
-      config: (n.data as any).config || {},
-      status: (n.data as any).status || 'configured'
-    }));
+    try {
+      const canonicalNodes: ArchitectureNode[] = nodes.map((n) => ({
+        id: n.id,
+        name: (n.data as any).name,
+        type: (n.data as any).type,
+        category: (n.data as any).category,
+        position: n.position,
+        config: (n.data as any).config || {},
+        status: (n.data as any).status || 'configured'
+      }));
 
-    const canonicalConnections: ArchitectureConnection[] = edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      source_handle: e.sourceHandle || undefined,
-      target_handle: e.targetHandle || undefined
-    }));
+      const canonicalConnections: ArchitectureConnection[] = edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        source_handle: e.sourceHandle || undefined,
+        target_handle: e.targetHandle || undefined
+      }));
 
-    const updatedArch: ArchitectureSchema = {
-      ...architecture,
-      nodes: canonicalNodes,
-      connections: canonicalConnections
-    };
+      const updatedArch: ArchitectureSchema = {
+        ...architecture,
+        nodes: canonicalNodes,
+        connections: canonicalConnections
+      };
 
-    await onSave(updatedArch);
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
+      await onSave(updatedArch);
+      hasModifiedRef.current = false;
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } finally {
+      setIsSaving(false);
+      isSavingRef.current = false;
+    }
   };
+
+  // Auto-sync debounce effect
+  useEffect(() => {
+    if (!hasModifiedRef.current) return;
+    const timer = setTimeout(() => {
+      handleSave();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [nodes, edges]);
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null;
@@ -301,13 +324,30 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
           <span className="text-[11px] font-mono text-slate-500 font-medium">
             {nodes.length} Components, {edges.length} Connections
           </span>
+          <span className="text-slate-300">•</span>
+          {isSaving ? (
+            <span className="flex items-center gap-1.5 text-xs font-mono text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Auto-Syncing...
+            </span>
+          ) : saveSuccess ? (
+            <span className="flex items-center gap-1.5 text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              Live Synced
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Auto-Sync Active
+            </span>
+          )}
         </div>
 
         {/* Toolbar Buttons */}
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleAutoLayout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 shadow-xs transition-all cursor-pointer"
             title="Auto-organize topology hierarchy"
           >
             <Layout className="w-3.5 h-3.5 text-amber-600" />
@@ -316,7 +356,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
           <button
             onClick={onValidate}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 shadow-xs transition-all cursor-pointer"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>Validate</span>
@@ -324,7 +364,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
           <button
             onClick={onOpenVersions}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 shadow-xs transition-all cursor-pointer"
           >
             <History className="w-3.5 h-3.5 text-violet-600" />
             <span>Versions</span>
@@ -333,7 +373,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
               saveSuccess
                 ? 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-xs font-bold'
                 : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900 shadow-xs'
@@ -345,7 +385,7 @@ export const ArchitectureCanvas: React.FC<ArchitectureCanvasProps> = ({
 
           <button
             onClick={onRunSimulation}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02]"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-400 hover:to-amber-500 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span className="font-mono text-[11px] uppercase tracking-wider">Simulate</span>
