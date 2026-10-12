@@ -1,15 +1,17 @@
 ================================================================================
-CLOUDTWIN — END-TO-END AWS CONSOLE MASTER ACTION GUIDE (FROM SCRATCH)
+CLOUDTWIN — END-TO-END AWS CONSOLE MASTER ACTION & TEAM HANDOFF GUIDE (v2.0)
 ================================================================================
-Solo Developer Implementation Guide (No External Members Needed)
+Solo Developer & Cross-Functional Engineering Master Blueprint
 Target AWS Region: ap-south-1 (Asia Pacific — Mumbai)
 Platform: CloudTwin Digital Twin & What-If Simulation Engine
+Scope: 11 AWS Native Services, Complete Console Provisioning, Deployment & Teardown
 ================================================================================
 
 This document provides complete, bit-by-bit, click-by-click instructions to 
 provision all 11 AWS services directly within the AWS Management Console from scratch.
-It also details exactly where to retrieve every credential, endpoint, and table name
-from the console and how to plug them into your CloudTwin local `.env` file.
+It also details the exact obstacles faced during deployment and testing, the architectural
+solutions implemented, the complete `.env` mapping, and the exact teardown/stop commands
+to prevent accidental AWS billing.
 
 --------------------------------------------------------------------------------
 TABLE OF CONTENTS
@@ -17,7 +19,7 @@ TABLE OF CONTENTS
 1. Prerequisites & Credentials Master Mapping Table
 2. STEP 0: IAM User Creation, Policies & Programmatic Access Keys
 3. STEP 1: AWS VPC & Networking Setup (Subnets, CIDRs, Gateways, Routes)
-4. STEP 2: VPC Security Groups Configuration
+4. STEP 2: VPC Security Groups Configuration (ALB, App, and Database)
 5. STEP 3: Amazon S3 Storage Buckets (Architecture & Reports Vaults)
 6. STEP 4: Amazon DynamoDB Tables (Telemetry Events & Graph Catalog)
 7. STEP 5: Amazon RDS PostgreSQL Database & Schema Migration
@@ -25,25 +27,33 @@ TABLE OF CONTENTS
 9. STEP 7: Serverless & Edge Delivery (AWS Lambda, API Gateway & CloudFront)
 10. STEP 8: Security Hub (CIS Benchmarks) & AWS Pricing Calculator
 11. STEP 9: Master `.env` Configuration File (Direct Copy-Paste)
-12. STEP 10: Execution, Verification & Testing Workflow
+12. STEP 10: Local & Production Execution Workflow
+13. STEP 11: Real Obstacles Faced & Engineering Solutions
+    - 11.1 Reload Reset Bug & State Persistence (LocalStorage + Hash)
+    - 11.2 Real-Time Auto-Sync Telemetry (Debounced Save & Live Badges)
+    - 11.3 Simulation Adapter NameError & Bottleneck Attribute Bugs
+    - 11.4 Nginx Reverse Proxy 502 Bad Gateway Timeout Tuning
+    - 11.5 HTTPS / TLS 1.3 Let's Encrypt & DuckDNS Mixed Content Resolution
+    - 11.6 Git Merge Conflicts on EC2 Servers
+14. STEP 12: Safe Teardown & AWS Billing Prevention Guide
 
 ================================================================================
 1. PREREQUISITES & CREDENTIALS MASTER MAPPING TABLE
 ================================================================================
 
 Before starting, log in to the AWS Management Console (https://console.aws.amazon.com).
-Look at the top-right corner of the console and ensure your region is set to:
+Ensure your region in the top-right corner is set to:
 `Asia Pacific (Mumbai) ap-south-1`.
 
-As you complete each step, copy the retrieved value and save it for your `.env` file:
+As you provision each service, note the values for your `.env` configuration:
 
 +----------------------------+-----------------------------------+-------------------------------------------------------------+
 | .ENV VARIABLE              | AWS CONSOLE LOCATION              | EXAMPLE / FORMAT                                            |
 +----------------------------+-----------------------------------+-------------------------------------------------------------+
 | AWS_DEFAULT_REGION         | Top-right console region selector | ap-south-1                                                  |
 | AWS_REGION                 | Top-right console region selector | ap-south-1                                                  |
-| AWS_ACCESS_KEY_ID          | IAM -> Users -> Security creds    | AKIAIOSFODNN7EXAMPLE (20 alphanumeric characters)           |
-| AWS_SECRET_ACCESS_KEY      | IAM -> Users -> Security creds    | wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY (40 characters)     |
+| AWS_ACCESS_KEY_ID          | IAM -> Users -> Security creds    | AKIA... (20 alphanumeric characters)                        |
+| AWS_SECRET_ACCESS_KEY      | IAM -> Users -> Security creds    | ebn2DvKn... (40 characters)                                 |
 | DATABASE_URL               | RDS -> Databases -> Endpoint      | postgresql://cloudtwin_admin:Pass@endpoint:5432/cloudtwin    |
 | AWS_S3_BUCKET              | S3 -> Buckets list                | cloudtwin-architecture-vault-santanu-XXXX                   |
 | AWS_S3_REPORTS_BUCKET      | S3 -> Buckets list                | cloudtwin-reports-vault-santanu-XXXX                        |
@@ -57,601 +67,169 @@ As you complete each step, copy the retrieved value and save it for your `.env` 
 ================================================================================
 2. STEP 0: IAM USER CREATION, POLICIES & PROGRAMMATIC ACCESS KEYS
 ================================================================================
-Your local FastAPI backend uses the Python `boto3` SDK to upload architecture
+The FastAPI backend uses the Python `boto3` SDK to upload architecture
 snapshots to S3, record simulation events into DynamoDB, and query AWS health.
-You must create a programmatic IAM User to obtain Access Keys.
 
-1. Search "IAM" in the top search bar and click on "IAM" (Identity and Access Management).
-2. In the left navigation panel, click "Users".
-3. Click the orange "Create user" button.
-
-Step 0.1: Specify User Details
-- User name: `cloudtwin-admin-user`
-- Checkbox "Provide user access to the AWS Management Console": LEAVE UNCHECKED 
-  (This user is strictly for Python backend API/SDK access).
-- Click "Next".
-
-Step 0.2: Set Permissions
-- Select the radio button: "Attach policies directly".
-- In the search bar under "Permissions policies", search and check the box for each:
-  1. `AmazonS3FullAccess`
-  2. `AmazonDynamoDBFullAccess`
-  3. `AmazonRDSFullAccess`
-  4. `CloudWatchReadOnlyAccess`
-  (Note: In a development/sandbox account, you may also attach `AdministratorAccess`).
-- Click "Next".
-
-Step 0.3: Review & Create
-- Review the user name and policies.
-- Click the orange "Create user" button at the bottom right.
-
-Step 0.4: Generate & Retrieve Access Keys
-- You are redirected to the "Users" list. Click on the newly created user `cloudtwin-admin-user`.
-- Click on the "Security credentials" tab (next to Permissions).
-- Scroll down to the "Access keys" section and click "Create access key".
-- Under "Access key best practices & alternatives", select the radio button:
-  "Command Line Interface (CLI)" OR "Application running outside AWS".
-- Scroll down and check the confirmation box: "I understand the above recommendation...".
-- Click "Next".
-- Description tag value (optional): `cloudtwin-backend-key`.
-- Click "Create access key".
-- COPY THESE TWO VALUES IMMEDIATELY:
-  * Access key: `AKIA...` (This will be your `AWS_ACCESS_KEY_ID`)
-  * Secret access key: Click "Show" or "Download .csv file" (This will be your `AWS_SECRET_ACCESS_KEY`)
-  * NOTE: The secret key will NEVER be shown again after closing this screen.
-- Click "Done".
+1. Search "IAM" in the AWS search bar and click on "IAM".
+2. In the left panel, click "Users" -> Click "Create user".
+3. Step 0.1: Details:
+   - User name: `cloudtwin-admin-user`
+   - Checkbox "Provide user access to the AWS Management Console": LEAVE UNCHECKED.
+   - Click "Next".
+4. Step 0.2: Permissions:
+   - Select "Attach policies directly".
+   - Search and attach:
+     * `AmazonS3FullAccess`
+     * `AmazonDynamoDBFullAccess`
+     * `AmazonRDSFullAccess`
+     * `CloudWatchReadOnlyAccess`
+   - Click "Next" -> Click "Create user".
+5. Step 0.3: Retrieve Access Keys:
+   - Click on the newly created user `cloudtwin-admin-user`.
+   - Click on the "Security credentials" tab -> Click "Create access key".
+   - Select "Command Line Interface (CLI)" or "Application running outside AWS".
+   - Check confirmation box -> Click "Next" -> Click "Create access key".
+   - Copy `Access key ID` and `Secret access key` immediately to your notes.
 
 
 ================================================================================
 3. STEP 1: AWS VPC & NETWORKING SETUP
 ================================================================================
-CloudTwin models and deploys across a production VPC spanning 2 Availability
-Zones with isolated public and private subnets, an Internet Gateway, and a NAT Gateway.
+CloudTwin models and deploys across a production VPC spanning 2 Availability Zones.
 
---------------------------------------------------------------------------------
-OPTION A: THE ALL-IN-ONE CONSOLE WIZARD ("VPC and more" — RECOMMENDED)
---------------------------------------------------------------------------------
-1. In the search bar, type "VPC" and open the VPC service.
-2. Click the orange "Create VPC" button.
-3. Under "VPC settings", select the radio button "VPC and more".
-4. Configure each field:
-   - Name tag auto-generation: `cloudtwin`
+Using the Console Wizard ("VPC and more"):
+1. Search "VPC" -> Click "Create VPC".
+2. Select "VPC and more".
+3. Configuration:
+   - Name tag: `cloudtwin`
    - IPv4 CIDR block: `10.0.0.0/16`
-   - IPv6 CIDR block: `No IPv6 CIDR block`
-   - Tenancy: `Default`
-   - Number of Availability Zones (AZs): Select `2`
-   - Customize AZs:
-     * AZ 1: `ap-south-1a`
-     * AZ 2: `ap-south-1b`
-   - Number of public subnets: Select `2`
-   - Number of private subnets: Select `2`
-   - Subnet CIDR block allocation:
-     * Public subnet in ap-south-1a: `10.0.0.0/20`
-     * Public subnet in ap-south-1b: `10.0.16.0/20`
-     * Private subnet in ap-south-1a: `10.0.128.0/20`
-     * Private subnet in ap-south-1b: `10.0.144.0/20`
-   - NAT gateways ($): Select `In 1 AZ` (Saves AWS cost while routing private subnets to internet)
-   - VPC Endpoints: Select `None`
-   - DNS options:
-     * [x] Enable DNS hostnames (Checked)
-     * [x] Enable DNS resolution (Checked)
-5. Review the graphical preview on the right.
-6. Click the orange "Create VPC" button.
-7. Wait 30–60 seconds for VPC, subnets, route tables, IGW, and NAT gateway to deploy.
-8. Click "View VPC".
-
---------------------------------------------------------------------------------
-OPTION B: MANUAL SCRATCH CREATION (IF CREATING EACH COMPONENT SEPARATELY)
---------------------------------------------------------------------------------
-If you prefer creating each networking piece individually:
-
-1. Create VPC:
-   - VPC Console -> "Your VPCs" -> "Create VPC".
-   - Select "VPC only" -> Name: `cloudtwin-vpc` -> IPv4 CIDR: `10.0.0.0/16` -> Create.
-   - Select `cloudtwin-vpc` -> Actions -> "Edit VPC settings" -> Enable "DNS hostnames" & "DNS resolution" -> Save.
-
-2. Create Subnets (VPC Console -> "Subnets" -> "Create subnet"):
-   - Subnet 1 (Public AZ-1):
-     * VPC: `cloudtwin-vpc`
-     * Subnet name: `cloudtwin-public-subnet-1`
-     * Availability Zone: `ap-south-1a`
-     * IPv4 subnet CIDR block: `10.0.0.0/20`
-     * Click "Add new subnet".
-   - Subnet 2 (Public AZ-2):
-     * VPC: `cloudtwin-vpc`
-     * Subnet name: `cloudtwin-public-subnet-2`
-     * Availability Zone: `ap-south-1b`
-     * IPv4 subnet CIDR block: `10.0.16.0/20`
-     * Click "Add new subnet".
-   - Subnet 3 (Private AZ-1):
-     * VPC: `cloudtwin-vpc`
-     * Subnet name: `cloudtwin-private-subnet-1`
-     * Availability Zone: `ap-south-1a`
-     * IPv4 subnet CIDR block: `10.0.128.0/20`
-     * Click "Add new subnet".
-   - Subnet 4 (Private AZ-2):
-     * VPC: `cloudtwin-vpc`
-     * Subnet name: `cloudtwin-private-subnet-2`
-     * Availability Zone: `ap-south-1b`
-     * IPv4 subnet CIDR block: `10.0.144.0/20`
-   - Click "Create subnet".
-   - For both public subnets: Select the subnet -> Actions -> "Edit subnet settings" -> Check "Enable auto-assign public IPv4 address" -> Save.
-
-3. Create Internet Gateway:
-   - VPC Console -> "Internet gateways" -> "Create internet gateway".
-   - Name: `cloudtwin-igw` -> Click "Create".
-   - Select `cloudtwin-igw` -> Actions -> "Attach to VPC" -> Select `cloudtwin-vpc` -> Attach.
-
-4. Create NAT Gateway (For Private Subnets outbound traffic):
-   - VPC Console -> "NAT gateways" -> "Create NAT gateway".
-   - Name: `cloudtwin-nat-gw`
-   - Subnet: Select `cloudtwin-public-subnet-1`
-   - Connectivity type: Public
-   - Elastic IP: Click "Allocate Elastic IP" -> Click "Create NAT gateway".
-
-5. Create Route Tables:
-   - Public Route Table:
-     * VPC Console -> "Route tables" -> "Create route table" -> Name: `cloudtwin-public-rt` -> VPC: `cloudtwin-vpc` -> Create.
-     * Select `cloudtwin-public-rt` -> "Routes" tab -> "Edit routes" -> "Add route":
-       Destination: `0.0.0.0/0` | Target: Internet Gateway (`cloudtwin-igw`) -> Save.
-     * "Subnet associations" tab -> "Edit subnet associations" -> Select `cloudtwin-public-subnet-1` and `cloudtwin-public-subnet-2` -> Save.
-   - Private Route Table:
-     * VPC Console -> "Route tables" -> "Create route table" -> Name: `cloudtwin-private-rt` -> VPC: `cloudtwin-vpc` -> Create.
-     * Select `cloudtwin-private-rt` -> "Routes" tab -> "Edit routes" -> "Add route":
-       Destination: `0.0.0.0/0` | Target: NAT Gateway (`cloudtwin-nat-gw`) -> Save.
-     * "Subnet associations" tab -> "Edit subnet associations" -> Select `cloudtwin-private-subnet-1` and `cloudtwin-private-subnet-2` -> Save.
+   - Number of AZs: `2` (`ap-south-1a`, `ap-south-1b`)
+   - Number of public subnets: `2` (`10.0.0.0/20`, `10.0.16.0/20`)
+   - Number of private subnets: `2` (`10.0.128.0/20`, `10.0.144.0/20`)
+   - NAT gateways: `In 1 AZ` (or None if running purely on public subnets to minimize costs)
+   - DNS options: Enable DNS hostnames [x] & DNS resolution [x]
+4. Click "Create VPC".
 
 
 ================================================================================
 4. STEP 2: VPC SECURITY GROUPS CONFIGURATION
 ================================================================================
-Create 3 specialized Security Groups to enforce strict layered security.
+Go to: VPC Console -> "Security groups" (under Security).
 
-Go to: VPC Console -> Left panel -> "Security groups" (under Security).
+1. ALB Security Group (`cloudtwin-alb-sg`):
+   - VPC: `cloudtwin-vpc`
+   - Inbound: Port 80 (HTTP) -> `0.0.0.0/0`, Port 443 (HTTPS) -> `0.0.0.0/0`.
 
---------------------------------------------------------------------------------
-2.1 Create ALB Security Group (Public Web Ingress)
---------------------------------------------------------------------------------
-1. Click "Create security group".
-2. Basic details:
-   - Security group name: `cloudtwin-alb-sg`
-   - Description: `Allow public internet ingress to ALB on ports 80 and 443`
-   - VPC: Select `cloudtwin-vpc`
-3. Inbound rules:
-   - Click "Add rule":
-     * Type: `HTTP` | Protocol: `TCP` | Port range: `80` | Source: `Anywhere-IPv4` (`0.0.0.0/0`)
-   - Click "Add rule":
-     * Type: `HTTPS` | Protocol: `TCP` | Port range: `443` | Source: `Anywhere-IPv4` (`0.0.0.0/0`)
-4. Outbound rules: Leave default (All traffic to `0.0.0.0/0`).
-5. Click "Create security group".
-6. Copy the Security Group ID: `sg-0a1b2c3d...` (You will use this in the next group).
+2. App / EC2 Security Group (`cloudtwin-ec2-sg`):
+   - VPC: `cloudtwin-vpc`
+   - Inbound:
+     * Port 22 (SSH) -> `My IP` (or `0.0.0.0/0`)
+     * Port 80 (HTTP) -> `0.0.0.0/0`
+     * Port 443 (HTTPS) -> `0.0.0.0/0`
+     * Port 8000 (Custom TCP) -> `cloudtwin-alb-sg` (or `0.0.0.0/0`)
 
---------------------------------------------------------------------------------
-2.2 Create App / Compute Security Group (EC2 & ECS)
---------------------------------------------------------------------------------
-1. Click "Create security group".
-2. Basic details:
-   - Security group name: `cloudtwin-app-sg`
-   - Description: `Allow compute ingress strictly from ALB on port 8000 and SSH`
-   - VPC: Select `cloudtwin-vpc`
-3. Inbound rules:
-   - Click "Add rule":
-     * Type: `Custom TCP` | Port range: `8000` | Source: Click the search box, select `cloudtwin-alb-sg`
-   - Click "Add rule":
-     * Type: `SSH` | Port range: `22` | Source: Select `My IP` (Protects your SSH access)
-4. Outbound rules: Leave default (All traffic).
-5. Click "Create security group".
-6. Copy the Security Group ID: `sg-0e5f6g7h...`.
-
---------------------------------------------------------------------------------
-2.3 Create Database Security Group (RDS PostgreSQL)
---------------------------------------------------------------------------------
-1. Click "Create security group".
-2. Basic details:
-   - Security group name: `cloudtwin-db-sg`
-   - Description: `Allow PostgreSQL access from app layer and local development IP`
-   - VPC: Select `cloudtwin-vpc`
-3. Inbound rules:
-   - Click "Add rule":
-     * Type: `PostgreSQL` | Port range: `5432` | Source: Click search box, select `cloudtwin-app-sg`
-   - Click "Add rule" (For direct connections from your local machine to RDS):
-     * Type: `PostgreSQL` | Port range: `5432` | Source: Select `My IP`
-4. Click "Create security group".
+3. Database Security Group (`cloudtwin-db-sg`):
+   - VPC: `cloudtwin-vpc`
+   - Inbound:
+     * Port 5432 (PostgreSQL) -> Source: `cloudtwin-ec2-sg`
+     * Port 5432 (PostgreSQL) -> Source: `My IP` (Allows local laptop migrations)
 
 
 ================================================================================
 5. STEP 3: AMAZON S3 STORAGE BUCKETS
 ================================================================================
-CloudTwin requires two Amazon S3 buckets:
-1. `cloudtwin-architecture-vault`: For architecture graph export JSONs, topology state, and node assets.
-2. `cloudtwin-reports-vault`: For simulation run logs, CIS compliance PDFs, and cost breakdown exports.
+CloudTwin requires two S3 buckets:
 
-S3 bucket names must be globally unique across all AWS accounts worldwide.
-Choose a suffix such as your name or random digits (e.g., `cloudtwin-architecture-vault-santanu-101`).
+1. Architecture Vault (`cloudtwin-architecture-vault-<name>-<digits>`):
+   - Region: `ap-south-1`
+   - Block all public access: Checked [x]
+   - Bucket Versioning: Enabled
+   - Encryption: SSE-S3
 
---------------------------------------------------------------------------------
-3.1 Bucket 1: Architecture Vault
---------------------------------------------------------------------------------
-1. Search "S3" in the top console search bar and click on "S3".
-2. Click the orange "Create bucket" button.
-3. General configuration:
-   - AWS Region: `Asia Pacific (Mumbai) ap-south-1`
-   - Bucket name: `cloudtwin-architecture-vault-<your-name>-<random-digits>`
-     *(Example: `cloudtwin-architecture-vault-santanu-8831`)*
-4. Object Ownership:
-   - Select `ACLs disabled (recommended)`.
-5. Block Public Access settings:
-   - Ensure `Block all public access` is CHECKED [x] (True).
-6. Bucket Versioning:
-   - Select `Enable` (Allows preserving and rolling back architecture versions).
-7. Default encryption:
-   - Encryption type: `Server-side encryption with Amazon S3 managed keys (SSE-S3)`
-   - Bucket Key: `Enable`
-8. Click the orange "Create bucket" button.
-9. Copy the bucket name -> This is your `AWS_S3_BUCKET` in `.env`.
-
---------------------------------------------------------------------------------
-3.2 Bucket 2: Reports & Audit Vault
---------------------------------------------------------------------------------
-1. Click "Create bucket" again.
-2. General configuration:
-   - AWS Region: `ap-south-1`
-   - Bucket name: `cloudtwin-reports-vault-<your-name>-<random-digits>`
-     *(Example: `cloudtwin-reports-vault-santanu-8831`)*
-3. Block Public Access:
-   - Ensure `Block all public access` is CHECKED [x].
-4. Default encryption:
-   - Select `SSE-S3`.
-5. Click "Create bucket".
-6. Copy the bucket name -> This is your `AWS_S3_REPORTS_BUCKET` in `.env`.
+2. Reports Vault (`cloudtwin-reports-vault-<name>-<digits>`):
+   - Region: `ap-south-1`
+   - Block all public access: Checked [x]
+   - Encryption: SSE-S3
 
 
 ================================================================================
 6. STEP 4: AMAZON DYNAMODB TABLES
 ================================================================================
-CloudTwin uses DynamoDB for ultra-low latency real-time telemetry events and
-graph catalogs.
+Go to: DynamoDB Console -> "Tables" -> "Create table".
 
---------------------------------------------------------------------------------
-4.1 Table 1: `CloudTwinSimulationEvents` (Real-Time Telemetry Stream)
---------------------------------------------------------------------------------
-1. Search "DynamoDB" in the top search bar and open the DynamoDB console.
-2. In the left navigation panel, click "Tables".
-3. Click the orange "Create table" button.
-4. Table details:
-   - Table name: `CloudTwinSimulationEvents`
-   - Partition key (Hash key): `simulation_id` -> Data type: `String`
-   - Sort key (Range key): `timestamp` -> Data type: `String`
-5. Table settings:
-   - Select the radio button: `Customize settings`.
-   - Table class: `DynamoDB Standard`.
-   - Read/write capacity settings:
-     * Select `On-demand` (Recommended: pay only per simulation, 0 idle cost)
-       OR `Provisioned` with 5 RCU / 5 WCU.
-   - Encryption at rest: Select `Amazon DynamoDB managed key` or `AWS KMS`.
-6. Click "Create table" at the bottom right.
-7. Status will show "Creating" and turn to "Active" within 10 seconds.
-8. Table name `CloudTwinSimulationEvents` is your `DYNAMODB_TABLE_SIMULATIONS` in `.env`.
+1. Table: `CloudTwinSimulationEvents` (Real-Time Telemetry Stream)
+   - Partition key: `simulation_id` (String)
+   - Sort key: `timestamp` (String)
+   - Table class: Standard
+   - Capacity mode: `On-demand` (Pay-per-request, $0 idle cost)
 
---------------------------------------------------------------------------------
-4.2 Table 2: `cloudtwin_architectures` (Graph Catalog)
---------------------------------------------------------------------------------
-1. In the Tables list, click "Create table" again.
-2. Table details:
-   - Table name: `cloudtwin_architectures`
-   - Partition key: `project_id` -> Data type: `String`
-   - Sort key: `architecture_id` -> Data type: `String`
-3. Table settings:
-   - Select `Default settings`.
-4. Click "Create table".
+2. Table: `cloudtwin_architectures` (Graph Catalog)
+   - Partition key: `project_id` (String)
+   - Sort key: `architecture_id` (String)
+   - Capacity mode: `On-demand`
 
 
 ================================================================================
 7. STEP 5: AMAZON RDS POSTGRESQL DATABASE & SCHEMA MIGRATION
 ================================================================================
-CloudTwin stores user accounts, projects, canonical architecture schemas,
-and audit history in PostgreSQL.
-
---------------------------------------------------------------------------------
-5.1 Create a DB Subnet Group (Required for VPC Placement)
---------------------------------------------------------------------------------
-1. Search "RDS" in the top search bar and open RDS.
-2. In the left panel, click "Subnet groups" -> Click "Create DB subnet group".
-3. Subnet group details:
-   - Name: `cloudtwin-db-subnet-group`
-   - Description: `Private subnets in ap-south-1 for CloudTwin PostgreSQL`
-   - VPC: Select `cloudtwin-vpc`
-4. Add subnets:
-   - Availability Zones: Select `ap-south-1a` and `ap-south-1b`.
-   - Subnets: Check both private subnets (`10.0.128.0/20` and `10.0.144.0/20`).
-5. Click the orange "Create" button.
-
---------------------------------------------------------------------------------
-5.2 Create the PostgreSQL Database Instance
---------------------------------------------------------------------------------
-1. In the left panel, click "Databases" -> Click the orange "Create database" button.
-2. Choose creation method: Select `Standard create`.
-3. Engine options:
-   - Engine type: `PostgreSQL`
-   - Engine Version: `PostgreSQL 16.3-R1` (or latest 16.x)
-4. Templates:
-   - For Production Twin: Select `Production` (Enables Multi-AZ).
-   - For Minimal Cost / Learning: Select `Free tier` or `Dev/Test`.
-5. Availability and durability:
-   - Select `Multi-AZ DB instance` (Deploys standby in 2nd AZ for failover simulation).
-   *(Or `Single DB instance` if using Free Tier)*.
-6. Settings:
-   - DB instance identifier: `cloudtwin-rds-postgres`
+1. Create DB Subnet Group (`cloudtwin-db-subnet-group`):
+   - VPC: `cloudtwin-vpc`, subnets: both private (or public) subnets in `ap-south-1a/b`.
+2. Create Database:
+   - Engine: PostgreSQL 16.x
+   - Identifier: `cloudtwin-rds-postgres`
    - Master username: `cloudtwin_admin`
-   - Credentials management: Select `Self managed`
-   - Master password: Enter a strong password, e.g.: `Santanu2414`
-   - Confirm master password: Re-enter the same password.
-7. Instance configuration:
-   - DB instance class: Select `Burstable classes (includes t classes)`
-   - Choose: `db.t3.micro` (or `db.t3.medium`)
-8. Storage:
-   - Storage type: `General Purpose SSD (gp3)`
-   - Allocated storage: `20` GiB
-   - Storage autoscaling: UNCHECK "Enable storage autoscaling" (Prevents surprise bills).
-9. Connectivity:
-   - Compute resource: Select `Don't connect to an EC2 compute resource`.
-   - Network type: `IPv4`.
-   - Virtual private cloud (VPC): Select `cloudtwin-vpc`.
-   - DB Subnet group: Select `cloudtwin-db-subnet-group`.
-   - Public access: Select `Yes` (Allows connecting from your laptop development environment).
-   - Existing VPC security groups: Remove `default` and select `cloudtwin-db-sg`.
-   - Database port: `5432`.
-10. Additional configuration (Click arrow to expand):
-    - Initial database name: `cloudtwin`  <--- VERY IMPORTANT: Must be named `cloudtwin`
-    - Backup retention period: `7 days`
-    - Encryption: Check [x] "Enable encryption" (AWS KMS key `aws/rds`).
-11. Scroll to the bottom and click "Create database".
-
---------------------------------------------------------------------------------
-5.3 Retrieve Endpoint & Construct DATABASE_URL
---------------------------------------------------------------------------------
-1. Database creation takes about 5–10 minutes.
-2. Once the status shows "Available", click on `cloudtwin-rds-postgres`.
-3. Under the "Connectivity & security" tab, find:
-   - Endpoint: e.g. `cloudtwin-rds-postgres.c123456789.ap-south-1.rds.amazonaws.com`
-   - Port: `5432`
-4. Construct your `DATABASE_URL`:
-   `postgresql://cloudtwin_admin:Santanu2414@cloudtwin-rds-postgres.c123456789.ap-south-1.rds.amazonaws.com:5432/cloudtwin`
-
-
---------------------------------------------------------------------------------
-5.4 Apply SQL Schema to RDS
---------------------------------------------------------------------------------
-Run the migration script included in this repository from your terminal:
-```powershell
-# Using psql (PostgreSQL client)
-psql -h <YOUR-RDS-ENDPOINT> -p 5432 -U cloudtwin_admin -d cloudtwin -f database/aws_rds/001_rds_postgres_schema.sql
-```
-*(Or open pgAdmin / DBeaver, create a connection to the RDS endpoint, open `database/aws_rds/001_rds_postgres_schema.sql` and click Execute).*
+   - Master password: strong password (e.g., `Santanu2414`)
+   - Instance class: `db.t3.micro`
+   - Storage: 20 GiB gp3 (Disable autoscaling)
+   - Public access: `Yes` (for setup convenience)
+   - VPC Security Group: `cloudtwin-db-sg`
+   - Initial database name: `cloudtwin` (Under Additional configuration)
+3. Once Available, copy Endpoint and apply the schema:
+   ```bash
+   psql -h <RDS-ENDPOINT> -p 5432 -U cloudtwin_admin -d cloudtwin -f database/aws_rds/001_rds_postgres_schema.sql
+   ```
 
 
 ================================================================================
-8. STEP 6: COMPUTE & LOAD BALANCING (EC2, ALB & ECS FARGATE)
+8. STEP 6: COMPUTE & LOAD BALANCING (EC2 & ALB)
 ================================================================================
-
---------------------------------------------------------------------------------
-6.1 Launch EC2 Worker Instance (`cloudtwin-api-server`)
---------------------------------------------------------------------------------
-1. Search "EC2" in the search bar and open the EC2 console.
-2. Click "Launch instance".
-3. Name: `cloudtwin-api-server`.
-4. Application and OS Images (AMI): `Amazon Linux 2023 AMI` (64-bit x86).
-5. Instance type: `t3.micro` or `t3.medium`.
-6. Key pair (login): Choose an existing key pair or click "Create new key pair" (RSA / .pem).
-7. Network settings -> Click "Edit":
-   - VPC: Select `cloudtwin-vpc`.
-   - Subnet: Select `cloudtwin-private-subnet-1` (or `cloudtwin-public-subnet-1`).
-   - Auto-assign public IP: `Disable` (Ingress happens through ALB).
-   - Firewall: Select existing security group -> Choose `cloudtwin-app-sg`.
-8. Configure storage: `20 GiB gp3`.
-9. Click the orange "Launch instance" button.
-
---------------------------------------------------------------------------------
-6.2 Create Target Group & Application Load Balancer (ALB)
---------------------------------------------------------------------------------
-1. In the EC2 console left navigation panel, scroll down to "Load Balancing".
-2. Click "Target Groups" -> Click "Create target group".
-   - Target type: `Instances`.
-   - Target group name: `cloudtwin-tg`.
-   - Protocol: `HTTP` | Port: `8000`.
-   - IP address type: `IPv4`.
-   - VPC: Select `cloudtwin-vpc`.
-   - Health check path: `/docs` (or `/api/health`).
-   - Click "Next".
-   - Under "Available instances", select `cloudtwin-api-server`.
-   - Click "Include as pending below".
-   - Click "Create target group".
-
-3. In the left navigation, click "Load Balancers" -> Click "Create load balancer".
-   - Under "Application Load Balancer", click "Create".
-   - Load balancer name: `cloudtwin-alb`.
-   - Scheme: Select `Internet-facing`.
-   - IP address type: `IPv4`.
-   - Network mapping:
-     * VPC: Select `cloudtwin-vpc`.
-     * Mappings:
-       - Check `ap-south-1a` -> Select `cloudtwin-public-subnet-1`.
-       - Check `ap-south-1b` -> Select `cloudtwin-public-subnet-2`.
-   - Security groups: Remove default, select `cloudtwin-alb-sg`.
-   - Listeners and routing:
-     * Protocol: `HTTP` | Port: `80`.
-     * Default action: Forward to `cloudtwin-tg`.
-   - Click "Create load balancer".
-4. Click on `cloudtwin-alb`. Under the "Description" tab, copy the **DNS name**:
-   *(Example: `cloudtwin-alb-123456789.ap-south-1.elb.amazonaws.com`)*.
-
---------------------------------------------------------------------------------
-6.3 Create ECS Fargate Cluster & Service (Container Twin)
---------------------------------------------------------------------------------
-1. Search "ECS" (Elastic Container Service) and open ECS.
-2. In the left panel, click "Clusters" -> Click "Create cluster".
-   - Cluster name: `cloudtwin-cluster`.
-   - Infrastructure: Select `AWS Fargate (serverless)`.
-   - Click "Create".
-3. In the left panel, click "Task definitions" -> Click "Create new task definition":
-   - Task definition family: `cloudtwin-backend-task`.
-   - Launch type: `AWS Fargate`.
-   - CPU: `0.5 vCPU` | Memory: `1 GB`.
-   - Container - 1:
-     * Name: `cloudtwin-backend`.
-     * Image URI: `public.ecr.aws/docker/library/python:3.11-slim`.
-     * Container port: `8000` | Protocol: `TCP`.
-   - Click "Create".
-4. Go back to "Clusters" -> Click on `cloudtwin-cluster` -> "Services" tab -> Click "Create":
-   - Compute configuration: `Capacity provider strategy` (Fargate).
-   - Deployment configuration:
-     * Family: `cloudtwin-backend-task`.
-     * Service name: `cloudtwin-service`.
-     * Desired tasks: `2`.
-   - Networking:
-     * VPC: `cloudtwin-vpc`.
-     * Subnets: Select both private subnets.
-     * Security group: Select `cloudtwin-app-sg`.
-   - Load balancing:
-     * Load balancer type: `Application Load Balancer`.
-     * Select existing load balancer: `cloudtwin-alb`.
-     * Listener: `80:HTTP` | Target group: `cloudtwin-tg`.
-   - Click "Create".
+1. Launch EC2:
+   - Name: `CloudTwin-Production`
+   - AMI: Ubuntu Server 22.04 LTS (x86)
+   - Instance Type: `t3.medium` (or `t3.micro` with 2GB swapfile)
+   - Security Group: `cloudtwin-ec2-sg`
+   - Storage: 30 GiB gp3
+2. Elastic IP:
+   - Allocate Elastic IP in `ap-south-1` -> Associate to `CloudTwin-Production`.
 
 
 ================================================================================
 9. STEP 7: SERVERLESS & EDGE DELIVERY (LAMBDA, API GATEWAY & CLOUDFRONT)
 ================================================================================
-
---------------------------------------------------------------------------------
-7.1 Create AWS Lambda Function (`cloudtwin-order-processor`)
---------------------------------------------------------------------------------
-1. Search "Lambda" in the search bar and open Lambda.
-2. Click "Create function" (Author from scratch).
-3. Basic information:
-   - Function name: `cloudtwin-order-processor`
-   - Runtime: `Python 3.11` (or Python 3.12)
-   - Architecture: `x86_64`
-4. Advanced settings (Click expand):
-   - Check [x] "Enable VPC".
-   - VPC: Select `cloudtwin-vpc`.
-   - Subnets: Select both private subnets.
-   - Security groups: Select `cloudtwin-app-sg`.
-5. Click "Create function".
-6. In the "Code" tab, double-click `lambda_function.py`, replace with this code:
-```python
-import json
-
-def lambda_handler(event, context):
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({
-            "status": "SUCCESS",
-            "service": "cloudtwin-order-processor",
-            "architecture_engine": "CloudTwin Digital Twin",
-            "message": "Event processed through simulated microservice pipeline."
-        })
-    }
-```
-7. Click the blue "Deploy" button.
-8. Go to "Configuration" tab -> "General configuration" -> "Edit":
-   - Memory: `512 MB` | Timeout: `30 sec` -> Click "Save".
-
---------------------------------------------------------------------------------
-7.2 Create Amazon API Gateway REST API (`cloudtwin-api`)
---------------------------------------------------------------------------------
-1. Search "API Gateway" in the search bar and open API Gateway.
-2. Locate the "REST API" box (not Private) -> Click "Build".
-3. Choose the protocol: `REST` -> Create new API: Select `New API`.
-   - API name: `cloudtwin-api`.
-   - Endpoint Type: Select `Regional`.
-   - Click "Create API".
-4. Click "Create resource":
-   - Resource name: `orders` -> Resource path: `/orders` -> Click "Create resource".
-5. Click on `/orders` -> Click "Create method":
-   - Method type: `POST`.
-   - Integration type: Select `Lambda function`.
-   - Check [x] `Lambda proxy integration`.
-   - Lambda Function: Select `cloudtwin-order-processor`.
-   - Click "Create method".
-6. Click the blue "Deploy API" button:
-   - Stage: Select `*New Stage*`.
-   - Stage name: `prod`.
-   - Click "Deploy".
-7. In the left navigation, click "Stages" -> Click `prod`:
-   - Under "Stage Settings", find "Default Method Throttling":
-     * Check [x] "Enable throttling"
-     * Rate: `2000` req/s | Burst: `500`
-     * Click "Save Changes".
-8. Copy the "Invoke URL" at the top:
-   *(Example: `https://a1b2c3d4e5.execute-api.ap-south-1.amazonaws.com/prod`)*.
-
---------------------------------------------------------------------------------
-7.3 Create Amazon CloudFront CDN Distribution
---------------------------------------------------------------------------------
-1. Search "CloudFront" and open CloudFront.
-2. Click "Create distribution".
-3. Origin:
-   - Origin domain: Click into the input field and select your Application Load Balancer (`cloudtwin-alb...`).
-   - Protocol: Select `HTTP only` (or HTTPS if you configured SSL).
-4. Default cache behavior:
-   - Viewer protocol policy: Select `Redirect HTTP to HTTPS`.
-   - Allowed HTTP methods: Select `GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE`.
-   - Cache key and origin requests: Select `CachingOptimized`.
-5. Web Application Firewall (WAF):
-   - Select `Do not enable security protections` (avoids additional AWS charges).
-6. Click the orange "Create distribution" button.
-7. Copy the "Distribution domain name":
-   *(Example: `d1234abcd5678.cloudfront.net`)*.
+1. Lambda Function (`cloudtwin-order-processor`):
+   - Runtime: Python 3.11, VPC: `cloudtwin-vpc`.
+2. API Gateway (`cloudtwin-api`):
+   - Regional REST API with resource `/orders` proxying to Lambda function.
+3. CloudFront Distribution:
+   - Origin: ALB or EC2 Elastic IP, viewer protocol: Redirect HTTP to HTTPS.
 
 
 ================================================================================
-10. STEP 8: SECURITY HUB & AWS PRICING CALCULATOR AUDITS
+10. STEP 8: SECURITY HUB & AWS PRICING AUDITS
 ================================================================================
-
---------------------------------------------------------------------------------
-8.1 Enable CIS Benchmarks in AWS Security Hub
---------------------------------------------------------------------------------
-1. Search "Security Hub" and open Security Hub.
-2. Click "Go to Security Hub" -> Click "Enable Security Hub".
-3. In the left panel, click "Security standards".
-4. Turn ON:
-   - `CIS AWS Foundations Benchmark v1.4.0`
-   - `AWS Foundational Security Best Practices v1.0.0`
-5. Go to the "Findings" tab:
-   - Review findings for S3 Public Access, RDS Encryption, and Security Groups.
-   - CloudTwin's Security Scanner checks directly mirror these exact CIS rules!
-
---------------------------------------------------------------------------------
-8.2 AWS Pricing Calculator Reference Benchmark
---------------------------------------------------------------------------------
-1. Open https://calculator.aws/#/addService in your browser.
-2. Select Region: `Asia Pacific (Mumbai) ap-south-1`.
-3. Add the 11 CloudTwin services:
-   - EC2: 2x `t3.medium`, 30 GB gp3 ($60.80/month)
-   - RDS: PostgreSQL `db.t3.medium` Multi-AZ, 100 GB ($121.50/month)
-   - S3: 500 GB Standard ($11.60/month)
-   - ALB: 1 ALB, 1 LCU ($26.40/month)
-   - NAT Gateway: 1 Gateway, 100 GB data ($37.35/month)
-   - Lambda, API Gateway, CloudFront, DynamoDB, ECS: ~$107.00/month
-   - Total Monthly Spend Baseline: ~$365.00 USD (₹30,477.50 INR).
-4. Click "Share estimate" -> Click "Copy link".
+1. Security Hub: Turn ON `CIS AWS Foundations Benchmark v1.4.0`.
+   - CloudTwin's CIS security scanner validates against these exact rules.
+2. Pricing Baseline: ~$365.00/month baseline across all 11 AWS services.
 
 
 ================================================================================
-11. STEP 9: MASTER `.ENV` CONFIGURATION FILE (DIRECT COPY-PASTE)
+11. STEP 9: MASTER `.ENV` CONFIGURATION FILE
 ================================================================================
-Open your project's `.env` file (`c:\Users\santa\OneDrive\Desktop\CloudTwin\.env`)
-and replace the placeholders with the real values you retrieved:
-
 ```ini
 # ==============================================================================
 # CloudTwin Platform Environment Variables (.env)
-# Solo Full-Stack & AWS Architecture Lead
 # ==============================================================================
 
-# Frontend & Backend Network Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:8000/api
 
@@ -659,74 +237,121 @@ PORT=8000
 ENVIRONMENT=development
 DEMO_MODE=false
 
-# ==============================================================================
-# AWS Database & Storage Configuration (Live AWS Resources)
-# ==============================================================================
-# 1. AWS RDS PostgreSQL Connection URL (From Step 5)
-DATABASE_URL=postgresql://cloudtwin_admin:CloudTwin_SecurePass_2026!@cloudtwin-rds-postgres.c123456789.ap-south-1.rds.amazonaws.com:5432/cloudtwin
+# 1. AWS RDS PostgreSQL Connection URL
+DATABASE_URL=postgresql://cloudtwin_admin:Santanu2414@cloudtwin-rds-postgres.c5aqg8keklz4.ap-south-1.rds.amazonaws.com:5432/cloudtwin
 
-# 2. Amazon DynamoDB Table (From Step 4)
+# 2. Amazon DynamoDB Table
 DYNAMODB_TABLE_SIMULATIONS=CloudTwinSimulationEvents
 
-# 3. Amazon S3 Vaults (From Step 3)
+# 3. Amazon S3 Vaults
 AWS_S3_BUCKET=cloudtwin-architecture-vault-santanu-8831
 AWS_S3_REPORTS_BUCKET=cloudtwin-reports-vault-santanu-8831
 
 # JWT Authentication
 JWT_SECRET_KEY=cloudtwin-super-secure-jwt-secret-key-prod-2026
 
-# ==============================================================================
-# AWS IAM Programmatic Credentials (From Step 0)
-# ==============================================================================
+# AWS IAM Programmatic Credentials
 AWS_DEFAULT_REGION=ap-south-1
 AWS_REGION=ap-south-1
-AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS_ACCESS_KEY_ID=<YOUR_AWS_ACCESS_KEY_ID>
+AWS_SECRET_ACCESS_KEY=<YOUR_AWS_SECRET_ACCESS_KEY>
 AWS_SESSION_TOKEN=
 
-# Switch to 'false' to communicate with live AWS S3, DynamoDB, and RDS!
+# AWS Live Mode (false = live AWS account integration)
 AWS_MOCK_MODE=false
 
-
 # AI Provider
-AI_PROVIDER=mock
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
+AI_PROVIDER=gemini
+GEMINI_MODEL=gemini-flash-latest
+GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
 ```
 
 
 ================================================================================
-12. STEP 10: EXECUTION, VERIFICATION & TESTING WORKFLOW
+12. STEP 10: LOCAL & PRODUCTION EXECUTION WORKFLOW
 ================================================================================
 
---------------------------------------------------------------------------------
-12.1 Run the Backend
---------------------------------------------------------------------------------
-From your project root directory:
+Local Development:
 ```powershell
-cd c:\Users\santa\OneDrive\Desktop\CloudTwin
+# Backend
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-- Open Swagger API Documentation: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/api/health` -> returns `{"status": "healthy"}`
-- Test S3 Uploads: Save an architecture in the UI -> It syncs directly to your S3 bucket!
 
---------------------------------------------------------------------------------
-12.2 Run the Frontend
---------------------------------------------------------------------------------
-In a second terminal window:
-```powershell
-cd c:\Users\santa\OneDrive\Desktop\CloudTwin\frontend
+# Frontend
+cd frontend
 npm run dev
 ```
-- Open application: `http://localhost:3000`
-- Features ready to demonstrate:
-  1. Interactive Drag-and-Drop Canvas with 11 AWS services.
-  2. What-If Simulation Runner (Traffic Surges, AZ Outages, EC2 crashes).
-  3. Real-Time Cost Estimator ($ and ₹ currency conversion).
-  4. CIS Security Scanner with 1-click remediation.
-  5. Architecture Versioning & PDF Report Export.
+
+Production on EC2:
+```bash
+cd ~/CloudTwin
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+```
+
 
 ================================================================================
-END OF CLOUDTWIN SOLO DEVELOPER AWS MASTER ACTION GUIDE
+13. STEP 11: REAL OBSTACLES FACED & ENGINEERING SOLUTIONS
+================================================================================
+
+This section documents the critical obstacles solved during testing and deployment:
+
+13.1 Reload Reset Bug & State Persistence:
+- **Obstacle:** Refreshing the browser (`F5`) in the dashboard or canvas redirected
+  users back to the landing page, losing the active view.
+- **Solution:** Initialized `inStudio` and `activeTab` from `localStorage`
+  (`cloudtwin_in_studio`, `cloudtwin_active_tab`) and synced with URL hash (`#simulator`, `#cost`, etc.).
+  The user remains anchored on their active tab across reloads.
+
+13.2 Real-Time Auto-Sync Telemetry:
+- **Obstacle:** Editing node configurations or adding components did not update
+  cost calculations or security posture without manual saves or page refreshes.
+- **Solution:** Added a 1.5-second debounced auto-save hook in `ArchitectureCanvas.tsx`
+  with live toolbar indicators (`🟡 Auto-Syncing...` ➔ `🟢 Live Synced`), paired with
+  centralized `syncTelemetry` in `page.tsx` that triggers parallel background re-audits.
+
+13.3 Python Adapter Bugs:
+- **Obstacle:** `/simulations/run` failed with 500 error due to `custom_params` NameError
+  in `backend/integrations/simulation_engine/adapter.py`.
+- **Solution:** Safely fetched `custom_params = scenario_config.get('custom_params', {})`.
+- **Obstacle:** Recommendation engine failed accessing `b.resource_name`.
+- **Solution:** Implemented attribute fallback checking `component_id` and `resource_id`.
+
+13.4 Nginx Reverse Proxy 502 Bad Gateway Timeouts:
+- **Obstacle:** Heavy Monte Carlo simulations took >60s, triggering Nginx 502 Bad Gateway.
+- **Solution:** Extended proxy timeouts in `nginx.conf`:
+  `proxy_connect_timeout 300s; proxy_send_timeout 300s; proxy_read_timeout 300s;`.
+
+13.5 Insecure Blob Warnings & HTTPS Setup:
+- **Obstacle:** Browser blocked insecure HTTP blob exports (`blob:http://...`).
+- **Solution:** Configured free DuckDNS subdomain (`cloudtwin.duckdns.org`) with
+  automated Let's Encrypt TLS 1.3 certificates via `infrastructure/deployment/setup-ssl.sh`.
+
+13.6 Git Merge Conflicts on EC2:
+- **Obstacle:** Direct file edits on EC2 prevented `git pull origin main`.
+- **Solution:** Use `git stash && git pull origin main` for clean automated deployments.
+
+
+================================================================================
+14. STEP 12: SAFE TEARDOWN & AWS BILLING PREVENTION GUIDE
+================================================================================
+
+To ensure $0.00 surprise bills after demonstrations or testing:
+
+1. EC2 Instance:
+   - To Pause: `sudo shutdown -h now` or EC2 Console -> Instance state -> Stop.
+   - To Delete: EC2 Console -> Select `CloudTwin-Production` -> **Terminate instance**.
+2. Elastic IP:
+   - EC2 Console -> Elastic IPs -> **Disassociate** and **Release Elastic IP address**.
+   *(Crucial: AWS charges $0.005/hr for unattached/idle Elastic IPs!)*
+3. RDS PostgreSQL:
+   - RDS Console -> Select `cloudtwin-rds-postgres` -> Actions -> **Delete**.
+   - Uncheck final snapshot, uncheck automated backups, type `delete me` -> Delete.
+4. DynamoDB:
+   - DynamoDB Console -> Select `CloudTwinSimulationEvents` -> **Delete** -> Type `confirm`.
+5. S3 Buckets:
+   - S3 Console -> Select each bucket -> **Empty** (type `permanently delete`) -> **Delete**.
+6. Security Groups:
+   - Delete `cloudtwin-ec2-sg` and `cloudtwin-db-sg` after instances are removed.
+
+================================================================================
+END OF CLOUDTWIN MASTER ACTION & TEAM HANDOFF GUIDE (v2.0)
 ================================================================================

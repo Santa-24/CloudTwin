@@ -1,66 +1,81 @@
 ================================================================================
-CLOUDTWIN — PRODUCTION AWS EC2 & DOCKER DEPLOYMENT MASTER ACTION GUIDE
+CLOUDTWIN — PRODUCTION AWS EC2 & DOCKER DEPLOYMENT MASTER ACTION GUIDE (v2.0)
 ================================================================================
-Solo Developer End-to-End Production Deployment Guide (From Scratch)
+Solo Developer End-to-End Production Deployment & Troubleshooting Playbook
 Target AWS Region: ap-south-1 (Asia Pacific — Mumbai)
 Platform: CloudTwin Digital Twin & What-If Simulation Engine
-Target Architecture: AWS EC2 (Ubuntu 22.04 LTS) + Nginx + Docker Compose
+Target Architecture: AWS EC2 (Ubuntu 22.04 LTS) + Nginx (TLS 1.3) + Docker Compose
 ================================================================================
 
-This document provides complete, bit-by-bit, click-by-click instructions to 
-deploy the complete CloudTwin platform (Next.js Frontend + FastAPI Backend + Nginx) 
-directly onto an AWS EC2 instance in ap-south-1, connected to your live AWS RDS
-PostgreSQL database, Amazon S3 storage vaults, and Amazon DynamoDB tables.
+This document provides a battle-tested, click-by-click, and command-by-command guide
+to deploying, running, maintaining, and safely tearing down the CloudTwin platform on AWS.
+It incorporates every real-world obstacle encountered during production deployment,
+including Let's Encrypt SSL HTTPS provisioning, Nginx 502 Bad Gateway timeouts,
+Git merge conflicts on EC2, reload state persistence, real-time telemetry auto-sync,
+and AWS zero-cost teardown procedures.
 
 --------------------------------------------------------------------------------
 TABLE OF CONTENTS
 --------------------------------------------------------------------------------
-1. Architecture Overview & Network Flow
+1. Architecture Topology & Network Flow
 2. Prerequisites & Credentials Master Mapping Table
-3. STEP 1: Launch Production AWS EC2 Instance (Click-by-Click Console Setup)
+3. STEP 1: Launch Production AWS EC2 Instance (Console Setup)
 4. STEP 2: Configure RDS PostgreSQL Security Group for EC2
-5. STEP 3: Connect to EC2 via SSH (Windows PowerShell & macOS/Linux)
+5. STEP 3: Connect to EC2 (1-Click Browser Terminal or SSH)
 6. STEP 4: Automated Server Provisioning (Docker, Compose, Git)
-7. STEP 5: Production Environment Variables (.env Copy-Paste)
-8. STEP 6: Build & Launch Production Containers (Nginx, Backend, Frontend)
-9. STEP 7: Allocate & Associate AWS Elastic IP (Static Public IP)
-10. STEP 8: (Optional) Domain Name DNS & Free Let's Encrypt SSL Setup
-11. STEP 9: End-to-End Verification, Smoke Testing & Cloud Twin Audit
-12. STEP 10: Production Monitoring, Linux Swap & Maintenance Commands
+7. STEP 5: Production Environment Variables (.env Setup)
+8. STEP 6: Build & Launch Production Multi-Container Stack
+9. STEP 7: Allocate & Associate AWS Elastic IP (Static Public IPv4)
+10. STEP 8: Free Let's Encrypt SSL & DuckDNS Setup (HTTPS Security)
+11. STEP 9: Real-World Obstacles Faced & Exact Troubleshooting Solutions
+    - Obstacle 1: Git Merge Conflicts During EC2 Code Pulls
+    - Obstacle 2: 502 Bad Gateway on Simulation Engine & Timeout Tuning
+    - Obstacle 3: Python Adapter NameError & Bottleneck Attribute Bugs
+    - Obstacle 4: Browser Insecure Blob Warnings & Mixed Content
+    - Obstacle 5: Dashboard Reload Bug (Resetting to Landing Page)
+    - Obstacle 6: Real-Time Auto-Sync Across Canvas & Telemetry Tabs
+12. STEP 10: Complete Teardown & Billing Protection (Stop vs. Delete)
+13. Production Maintenance & Zero-Downtime Update Commands
 
 ================================================================================
-1. ARCHITECTURE OVERVIEW & NETWORK FLOW
+1. ARCHITECTURE TOPOLOGY & NETWORK FLOW
 ================================================================================
 
-When deployed, the production infrastructure runs according to this topology:
+When fully deployed, the production infrastructure runs according to this topology:
 
-[ Public Internet / Web Browsers ]
+[ Web Browsers / Public Internet ]
                  │
                  ▼
-     [ AWS Route 53 / Elastic IP ]
+     [ DuckDNS / AWS Elastic IP ]
                  │
-          Port 80 (HTTP) / Port 443 (HTTPS)
+       Port 80 (HTTP) -> Redirect 301
+       Port 443 (HTTPS / TLS 1.3)
                  │
                  ▼
   ┌─────────────────────────────────────────────────────────────┐
-  │ AWS EC2 INSTANCE: CloudTwin-Production (ap-south-1)        │
+  │ AWS EC2 INSTANCE: CloudTwin-Production (Ubuntu 22.04 LTS)   │
   │                                                             │
-  │   [ Nginx Reverse Proxy Container ]                         │
-  │   - Listens on 0.0.0.0:80 & 0.0.0.0:443                     │
+  │   [ Nginx Reverse Proxy Container (TLS 1.3 + Certbot) ]     │
+  │   - Port 80: ACME Challenge + 301 Redirect to HTTPS        │
+  │   - Port 443: SSL Termination                              │
   │   - Routes `/api/*` and `/docs` -> FastAPI Backend (8000)   │
   │   - Routes all other traffic `/*` -> Next.js Frontend (3000)│
+  │   - Proxy Timeouts tuned to 300s for heavy simulations      │
   │                                                             │
   │        ┌────────────────────────────┴─────────────────────┐ │
   │        ▼                                                  ▼ │
   │   [ Next.js Frontend ]                          [ FastAPI Backend ]
-  │   (Internal Port 3000)                          (Internal Port 8000)
+  │   (Port 3000, Node.js Standalone)               (Port 8000, Uvicorn)
+  │   - LocalStorage Session & Hash Routing          - Simulation Orchestrator
+  │   - 1.5s Debounced Auto-Save                     - CIS Security Auditor
+  │   - Live Telemetry Sync Badge                    - AWS Pricing & AI Advisor
   └────────┼──────────────────────────────────────────────────┼─┘
            │                                                  │
            │                                  ┌───────────────┼───────────────┐
            │                                  ▼               ▼               ▼
            │                         [ AWS RDS Postgres ] [ Amazon S3 ] [ DynamoDB ]
-           │                         cloudtwin-rds-...    Architecture  Simulation
-           │                         Port 5432            & Reports     Events
+           │                         Port 5432            Architecture  Simulation
+           │                         cloudtwin-rds-...    & Reports     Events
            │                                              Vaults        Stream
            ▼
 [ Digital Twin Canvas (11 AWS Node Types) ]
@@ -70,243 +85,123 @@ When deployed, the production infrastructure runs according to this topology:
 2. PREREQUISITES & CREDENTIALS MASTER MAPPING TABLE
 ================================================================================
 
-Before beginning deployment, confirm that your existing AWS resources in 
-`ap-south-1` (Mumbai) are active and retrieve the following values:
+Ensure the following AWS resources and credentials in `ap-south-1` (Mumbai)
+are prepared before deploying:
 
 +----------------------------+-------------------------------------------------------------+------------------------------------+
-| RESOURCE / VARIABLE        | LIVE VALUE IN YOUR AWS ACCOUNT                              | STATUS / NOTES                     |
+| RESOURCE / VARIABLE        | VALUE IN YOUR AWS ACCOUNT                                   | STATUS / NOTES                     |
 +----------------------------+-------------------------------------------------------------+------------------------------------+
 | AWS Region                 | ap-south-1 (Asia Pacific — Mumbai)                          | Active                             |
-| DATABASE_URL               | postgresql://cloudtwin_admin:Santanu2414@cloudtwin-rds-     | Active (Port 5432, Database:       |
+| DATABASE_URL               | postgresql://cloudtwin_admin:Pass@cloudtwin-rds-            | Active (Port 5432, Database:       |
 |                            | postgres.c5aqg8keklz4.ap-south-1.rds.amazonaws.com:5432/    | `cloudtwin`)                       |
 |                            | cloudtwin                                                   |                                    |
 | AWS_S3_BUCKET              | cloudtwin-architecture-vault-santanu-8831                   | Active (Versioning: Enabled)       |
 | AWS_S3_REPORTS_BUCKET      | cloudtwin-reports-vault-santanu-8831                        | Active (Versioning: Enabled)       |
 | DYNAMODB_TABLE_SIMULATIONS | CloudTwinSimulationEvents                                   | Active (Billing: Pay-Per-Request)  |
-| AWS_ACCESS_KEY_ID          | <YOUR_AWS_ACCESS_KEY_ID>                                    | Programmatic IAM User Access Key   |
-| AWS_SECRET_ACCESS_KEY      | <YOUR_AWS_SECRET_ACCESS_KEY>                                | Programmatic IAM User Secret Key   |
+| AWS_ACCESS_KEY_ID          | <YOUR_AWS_ACCESS_KEY_ID>                                    | IAM User Access Key                |
+| AWS_SECRET_ACCESS_KEY      | <YOUR_AWS_SECRET_ACCESS_KEY>                                | IAM User Secret Key                |
 | RDS Security Group ID      | sg-084e49d942e94aa18 (`cloudtwin-db-sg`)                    | Controls Port 5432 ingress         |
 | VPC ID                     | vpc-0c3713a08b16e7c10 (`cloudtwin-vpc`)                     | Main CloudTwin Production VPC      |
+| DuckDNS Domain             | cloudtwin.duckdns.org                                       | Free HTTPS Subdomain               |
 +----------------------------+-------------------------------------------------------------+------------------------------------+
 
 
 ================================================================================
-3. STEP 1: LAUNCH PRODUCTION AWS EC2 INSTANCE (CLICK-BY-CLICK CONSOLE SETUP)
+3. STEP 1: LAUNCH PRODUCTION AWS EC2 INSTANCE (CONSOLE SETUP)
 ================================================================================
 
-Step 1.1: Open EC2 Console
 1. Log in to the AWS Management Console: https://console.aws.amazon.com
-2. In the top-right corner, confirm the region is `Asia Pacific (Mumbai) ap-south-1`.
-3. In the search bar at the top, type "EC2" and click "EC2".
-4. In the left navigation panel, click "Instances".
-5. Click the orange "Launch instances" button at the top right.
+2. In the top-right corner, verify the region is `Asia Pacific (Mumbai) ap-south-1`.
+3. In the search bar, type "EC2" and click "EC2".
+4. Click "Instances" -> Click the orange "Launch instances" button.
 
-Step 1.2: Name and Tags
-- In the "Name" input field, enter: `CloudTwin-Production`
-
-Step 1.3: Application and OS Images (Amazon Machine Image - AMI)
-- Under "Quick Start", click the "Ubuntu" box.
-- Under "Amazon Machine Image (AMI)", verify the dropdown is set to:
-  `Ubuntu Server 22.04 LTS (HVM), SSD Volume Type` (64-bit (x86)).
-
-Step 1.4: Instance Type
-- Under "Instance type", click the dropdown and search for:
-  `t3.medium` (2 vCPU, 4 GiB Memory).
-  *(Why t3.medium: Next.js standalone container production builds require ~2.5 GB RAM.*
-  *If using Free Tier `t3.micro`, you must configure a 2GB Linux swapfile as detailed in Step 10).*
-
-Step 1.5: Key Pair (Login Credentials)
-- Under "Key pair (login)":
-  * If you already have a key pair, select it from the dropdown.
-  * If you need to create one:
-    1. Click "Create new key pair".
-    2. Key pair name: `cloudtwin-key`
-    3. Key pair type: `RSA`
-    4. Private key file format: Select `.pem` (for OpenSSH / PowerShell / macOS).
-    5. Click the orange "Create key pair" button.
-    6. Browser will download `cloudtwin-key.pem`. SAVE THIS FILE SAFELY in your 
-       Downloads or user folder (e.g. `C:\Users\santa\Downloads\cloudtwin-key.pem`).
-
-Step 1.6: Network Settings
-- Click the "Edit" button on the top right of the "Network settings" box.
-- Configure each setting:
-  1. Virtual private cloud (VPC):
-     * Select `cloudtwin-vpc` (or your default VPC).
-  2. Subnet:
-     * Select a Public Subnet: `cloudtwin-public-subnet-1` (or any public subnet with auto-assign IP).
-  3. Auto-assign public IP:
-     * Select `Enable` (Very important: allows connecting over SSH and public internet).
-  4. Firewall (security groups):
-     * Select the radio button: `Create security group`.
-     * Security group name: `cloudtwin-ec2-sg`
-     * Description: `Allow SSH, HTTP port 80 and HTTPS port 443 ingress for CloudTwin`
-  5. Inbound security groups rules:
-     * Rule 1 (SSH Access):
-       - Type: `SSH` | Protocol: `TCP` | Port range: `22`
-       - Source type: `My IP` (Recommended for security) OR `Anywhere-IPv4` (`0.0.0.0/0`)
-       - Description: `SSH terminal access`
-     * Click "Add security group rule":
-     * Rule 2 (HTTP Web Traffic):
-       - Type: `HTTP` | Protocol: `TCP` | Port range: `80`
-       - Source type: `Anywhere-IPv4` (`0.0.0.0/0`)
-       - Description: `Public HTTP web traffic to Nginx`
-     * Click "Add security group rule":
-     * Rule 3 (HTTPS Web Traffic):
-       - Type: `HTTPS` | Protocol: `TCP` | Port range: `443`
-       - Source type: `Anywhere-IPv4` (`0.0.0.0/0`)
-       - Description: `Secure HTTPS SSL web traffic`
-
-Step 1.7: Configure Storage
-- Under "Configure storage":
-  * Change size from `8` GiB to: `30` GiB.
-  * Volume type: `General purpose SSD (gp3)`.
-  * IOPS: `3000` | Throughput: `125` MB/s (Default gp3 settings).
-  * Encrypted: `Not encrypted` (or encrypted with default AWS key).
-
-Step 1.8: Review & Launch
-- In the right-hand "Summary" panel:
-  * Number of instances: `1`
-  * Software Image: `Ubuntu Server 22.04 LTS`
-  * Instance type: `t3.medium`
-  * Storage: `30 GiB gp3`
-- Click the orange "Launch instance" button.
-- Click "View all instances".
-- Wait 60–90 seconds until "Instance state" displays green `Running` and 
-  "Status check" displays `2/2 checks passed`.
-- Click on `CloudTwin-Production` in the list and copy its **Public IPv4 address**:
-  *(Example: `13.232.89.144`)*.
+Configure Instance Settings:
+- Name: `CloudTwin-Production`
+- OS Image (AMI): `Ubuntu Server 22.04 LTS (HVM), SSD Volume Type` (64-bit x86).
+- Instance Type: `t3.medium` (2 vCPU, 4 GiB Memory).
+  *(Next.js container production builds require ~2.5 GB RAM. If using t3.micro,
+   you must enable a 2GB Linux Swapfile as detailed in Section 13).*
+- Key pair: Choose `cloudtwin-key` or click "Create new key pair" (RSA, `.pem`).
+- Network settings: Click "Edit":
+  * VPC: Select `cloudtwin-vpc` (or default VPC).
+  * Subnet: Select a Public Subnet (e.g. `cloudtwin-public-subnet-1`).
+  * Auto-assign public IP: `Enable`.
+  * Security group: Create security group `cloudtwin-ec2-sg`:
+    - Rule 1: SSH (Port 22) -> Source: `My IP` (or `0.0.0.0/0`)
+    - Rule 2: HTTP (Port 80) -> Source: `0.0.0.0/0`
+    - Rule 3: HTTPS (Port 443) -> Source: `0.0.0.0/0`  <-- REQUIRED FOR SSL!
+- Storage: `30 GiB gp3` SSD.
+- Click "Launch instance". Wait ~60 seconds until status shows `Running`.
 
 
 ================================================================================
 4. STEP 2: CONFIGURE RDS POSTGRESQL SECURITY GROUP FOR EC2
 ================================================================================
 
-Your EC2 instance needs network permission to communicate with your live Amazon RDS
-PostgreSQL database on port 5432. We link the EC2 Security Group directly to the RDS
-Security Group:
-
-1. Search "VPC" in the top search bar and open the VPC service.
-2. In the left navigation panel, click "Security groups" (under Security).
-3. Find and select the RDS security group: `cloudtwin-db-sg` (ID: `sg-084e49d942e94aa18`).
-4. Click the "Inbound rules" tab at the bottom -> Click the white "Edit inbound rules" button.
-5. Click the "Add rule" button:
-   - Type: Select `PostgreSQL` from the dropdown (automatically sets Port `5432`).
-   - Protocol: `TCP`.
-   - Port range: `5432`.
-   - Source type: Select `Custom`.
-   - Source: Click inside the search box, start typing `cloudtwin-ec2-sg`, and select 
-     the security group you created in Step 1.
-   - Description: `Allow CloudTwin EC2 instance access to PostgreSQL`
-6. Keep your existing rule for `My IP` intact (allows connecting from your laptop).
-7. Click the orange "Save rules" button.
-
-*NOTE: By referencing `cloudtwin-ec2-sg` as the source, EC2 will maintain permanent*
-*database connectivity even if its public IP rotates!*
+Allow the EC2 instance to access the PostgreSQL database:
+1. Open the VPC Console -> "Security groups".
+2. Select the RDS database security group: `cloudtwin-db-sg`.
+3. Click "Inbound rules" tab -> "Edit inbound rules" -> "Add rule":
+   - Type: `PostgreSQL` (Port `5432`).
+   - Source: Search and select `cloudtwin-ec2-sg`.
+   - Description: `Allow CloudTwin EC2 instance ingress to PostgreSQL`.
+4. Click "Save rules".
 
 
 ================================================================================
+5. STEP 3: CONNECT TO EC2 (1-CLICK BROWSER TERMINAL OR SSH)
 ================================================================================
-5. STEP 3: CONNECT TO EC2 (RECOMMENDED: 1-CLICK AWS CONSOLE BROWSER TERMINAL)
-================================================================================
 
---------------------------------------------------------------------------------
-OPTION A: AWS CONSOLE "EC2 INSTANCE CONNECT" (RECOMMENDED — NO PEM KEY REQUIRED!)
---------------------------------------------------------------------------------
-This is the easiest, zero-friction method on Windows. You DO NOT need to configure 
-SSH keys, `.pem` files, or worry about Windows `chmod` permission errors!
+Option A (Recommended — No PEM file needed):
+1. In EC2 Console -> Select `CloudTwin-Production`.
+2. Click "Connect" at the top -> Keep "EC2 Instance Connect" tab selected.
+3. User name: `ubuntu` -> Click "Connect".
+4. A browser terminal opens directly into the server: `ubuntu@ip-10-0-9-85:~$ `
 
-1. In the AWS EC2 Console, click "Instances" in the left menu.
-2. Click to check the box next to your instance `CloudTwin-Production`.
-3. Click the white "Connect" button at the top of the screen.
-4. Keep the first tab selected: "EC2 Instance Connect".
-5. User name: `ubuntu` (pre-filled).
-6. Click the orange "Connect" button at the bottom right.
-7. A new browser tab opens with an active, secure Linux terminal:
-   `ubuntu@ip-10-0-9-85:~$ `
-   (You are already inside your EC2 server! Run all subsequent commands here).
-
---------------------------------------------------------------------------------
-OPTION B: CONNECT VIA WINDOWS POWERSHELL / SSH (OPTIONAL)
---------------------------------------------------------------------------------
-*NOTE: On Windows, `chmod` does NOT work and returns 'Permission denied' because*
-*Windows uses NTFS access control lists (ACLs). If using PowerShell, use `icacls`:*
-
-1. Open PowerShell and navigate to your Downloads folder:
-   ```powershell
-   cd C:\Users\santa\Downloads
-   ```
-2. Remove inherited Windows permissions on `cloudtwin.pem`:
-   ```powershell
-   icacls.exe cloudtwin.pem /reset
-   icacls.exe cloudtwin.pem /grant:r "$($env:username):(R)"
-   icacls.exe cloudtwin.pem /inheritance:r
-   ```
-3. Connect using SSH:
-   ```powershell
-   ssh -i "cloudtwin.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
-   ```
-   *(Or on macOS/Linux: `chmod 400 cloudtwin.pem && ssh -i cloudtwin.pem ubuntu@<IP>`)*.
+Option B (PowerShell SSH on Windows):
+```powershell
+cd C:\Users\santa\Downloads
+icacls.exe cloudtwin-key.pem /reset
+icacls.exe cloudtwin-key.pem /grant:r "$($env:username):(R)"
+icacls.exe cloudtwin-key.pem /inheritance:r
+ssh -i "cloudtwin-key.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
+```
 
 
 ================================================================================
 6. STEP 4: AUTOMATED SERVER PROVISIONING (DOCKER, COMPOSE, GIT)
 ================================================================================
 
-CloudTwin includes an automated server setup script in `infrastructure/deployment/setup-ec2.sh`.
-Run these commands in your EC2 terminal window:
+Run these commands in your EC2 terminal:
 
-Step 4.1: Clone the CloudTwin Repository
 ```bash
+# 1. Clone the repository
 git clone https://github.com/Santa-24/CloudTwin.git
 cd CloudTwin
-```
 
-Step 4.2: Make the Setup Script Executable & Run It
-```bash
+# 2. Run the automated provisioning script
 chmod +x infrastructure/deployment/setup-ec2.sh
 ./infrastructure/deployment/setup-ec2.sh
-```
 
-Step 4.3: What the Automated Script Installs:
-- Performs complete system update (`sudo apt-get update && sudo apt-get upgrade -y`).
-- Installs prerequisites (`ca-certificates`, `curl`, `gnupg`, `git`).
-- Configures the official Docker APT repository and GPG key.
-- Installs `docker-ce`, `docker-ce-cli`, `containerd.io`, and `docker-compose-plugin`.
-- Enables systemd Docker service on startup (`systemctl enable docker`).
-- Adds the `ubuntu` user to the `docker` security group.
-
-Step 4.4: Verify Docker Installation
-Run:
-```bash
+# 3. Verify Docker & Compose
 docker --version
 docker compose version
 ```
-Expected output:
-`Docker version 27.x.x, build ...`
-`Docker Compose version v2.x.x`
 
 
 ================================================================================
-7. STEP 5: PRODUCTION ENVIRONMENT VARIABLES (.ENV COPY-PASTE)
+7. STEP 5: PRODUCTION ENVIRONMENT VARIABLES (.ENV SETUP)
 ================================================================================
 
-Create the production `.env` configuration file in the root of your CloudTwin 
-directory on the EC2 instance.
+Create the production `.env` file on EC2:
 
-Step 5.1: Open the nano editor:
 ```bash
 nano .env
 ```
 
-Step 5.2: Copy and paste this exact configuration block:
-*(Press Right-Click in PowerShell to paste)*
+Paste the following configuration (replace with your active credentials):
 
 ```ini
-# ==============================================================================
-# CloudTwin Platform Production Environment Variables (.env)
-# Host: AWS EC2 (ap-south-1)
-# ==============================================================================
-
 # Core Application Settings
 PORT=8000
 ENVIRONMENT=production
@@ -315,24 +210,24 @@ DEMO_MODE=false
 # Live Amazon RDS PostgreSQL Database URL
 DATABASE_URL=postgresql://cloudtwin_admin:Santanu2414@cloudtwin-rds-postgres.c5aqg8keklz4.ap-south-1.rds.amazonaws.com:5432/cloudtwin
 
-# Amazon DynamoDB Table (Real-Time Simulation Telemetry Stream)
+# Amazon DynamoDB Table (Simulation Telemetry Stream)
 DYNAMODB_TABLE_SIMULATIONS=CloudTwinSimulationEvents
 
-# Amazon S3 Vaults (Live Architecture Storage & Audit PDF Reports)
+# Amazon S3 Vaults (Snapshots & Reports)
 AWS_S3_BUCKET=cloudtwin-architecture-vault-santanu-8831
 AWS_S3_REPORTS_BUCKET=cloudtwin-reports-vault-santanu-8831
 
-# JWT Secret Key for Session Authentication
+# JWT Secret Key
 JWT_SECRET_KEY=cloudtwin-super-secure-jwt-secret-key-prod-2026
 
-# AWS Region & Programmatic IAM Credentials (Boto3 SDK)
+# AWS Region & Programmatic IAM Credentials
 AWS_DEFAULT_REGION=ap-south-1
 AWS_REGION=ap-south-1
 AWS_ACCESS_KEY_ID=<YOUR_AWS_ACCESS_KEY_ID>
 AWS_SECRET_ACCESS_KEY=<YOUR_AWS_SECRET_ACCESS_KEY>
 AWS_SESSION_TOKEN=
 
-# AWS Live Mode (false = communicate directly with live AWS APIs)
+# AWS Live Mode (false = live AWS account integration)
 AWS_MOCK_MODE=false
 
 # AI Recommendation Provider Settings
@@ -341,64 +236,32 @@ GEMINI_MODEL=gemini-flash-latest
 GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
 ```
 
-Step 5.3: Save and Exit nano:
-1. Press `Ctrl + O` (WriteOut).
-2. Press `Enter` (Confirm file name `.env`).
-3. Press `Ctrl + X` (Exit editor).
+Save and exit nano: `Ctrl + O` -> `Enter` -> `Ctrl + X`.
 
 
 ================================================================================
-8. STEP 6: BUILD & LAUNCH PRODUCTION CONTAINERS
+8. STEP 6: BUILD & LAUNCH PRODUCTION MULTI-CONTAINER STACK
 ================================================================================
 
-Now launch the production Docker multi-container stack. This builds:
-1. `cloudtwin-backend`: FastAPI running under Uvicorn on internal port 8000.
-2. `cloudtwin-frontend`: Next.js production build running on internal port 3000.
-3. `cloudtwin-nginx`: Reverse proxy routing public ports 80/443 to frontend & backend.
+Launch the container stack:
 
-Step 6.1: Build and Launch Containers in Detached Mode
-From your `~/CloudTwin` directory:
 ```bash
 docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
 ```
-*(The initial build will take ~3 to 4 minutes to compile the Next.js production bundle)*.
 
-Step 6.2: Verify Container Status
-Run:
+Verify containers are running:
 ```bash
 docker compose -f infrastructure/docker/docker-compose.prod.yml ps
 ```
-You should see all three containers with status `Up` or `running`:
-```
-NAME                 IMAGE                        COMMAND                  SERVICE    STATUS
-cloudtwin-nginx      nginx:alpine                 "/docker-entrypoint.…"   nginx      Up (0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp)
-cloudtwin-backend    cloudtwin-backend:latest     "uvicorn backend.main…"  backend    Up (8000/tcp)
-cloudtwin-frontend   cloudtwin-frontend:latest    "node server.js"         frontend   Up (3000/tcp)
-```
 
-Step 6.3: Test Local Health from inside EC2
-Run:
+All 3 containers should display `Up`:
+- `docker-nginx-1` (Ports 80 & 443)
+- `docker-backend-1` (Port 8000 internal)
+- `docker-frontend-1` (Port 3000 internal)
+
+Test internal backend health:
 ```bash
 curl http://localhost/api/health
-```
-Expected JSON Response:
-```json
-{
-  "success": true,
-  "data": {
-    "status": "healthy",
-    "system": "CloudTwin Core Backend Orchestration Layer",
-    "version": "1.0.0",
-    "integrations": {
-      "simulation_engine": "online (canonical adapter active)",
-      "cost_engine": "online (AWS rates active)",
-      "security_engine": "online (CIS AWS scanner active)",
-      "recommendation_engine": "online (AI topology advisor active)",
-      "aws_rds_database": "ready (AWS RDS PostgreSQL / Aurora schema active)",
-      "amazon_s3_storage": "ready (Amazon S3 buckets configured)"
-    }
-  }
-}
 ```
 
 
@@ -406,159 +269,198 @@ Expected JSON Response:
 9. STEP 7: ALLOCATE & ASSOCIATE AWS ELASTIC IP (STATIC PUBLIC IP)
 ================================================================================
 
-Standard EC2 public IPs change if an instance is stopped or restarted. An AWS Elastic IP
-provides a permanent, static IPv4 address for your production platform:
-
-Step 7.1: Allocate Elastic IP
-1. Open the AWS EC2 Console: https://ap-south-1.console.aws.amazon.com/ec2/home?region=ap-south-1
-2. In the left navigation panel, scroll down to "Network & Security" -> click "Elastic IPs".
-3. Click the orange "Allocate Elastic IP address" button.
-4. Settings:
-   - Network Border Group: `ap-south-1`
-   - Public IPv4 address pool: `Amazon's pool of IPv4 addresses`
-5. Click the orange "Allocate" button at the bottom right.
-6. Copy the allocated Elastic IP address (e.g. `13.127.45.101`).
-
-Step 7.2: Associate Elastic IP to CloudTwin Instance
-1. In the Elastic IPs list, select the check box next to your new Elastic IP.
-2. Click the "Actions" dropdown button at the top right -> select "Associate Elastic IP address".
-3. Settings:
-   - Resource type: Select `Instance`.
-   - Instance: Click inside the search box and select `CloudTwin-Production`.
-   - Private IP address: Select the private IP of the instance (auto-filled).
-   - Reassociation: Leave unchecked.
-4. Click the orange "Associate" button.
-
-Step 7.3: Open CloudTwin in Your Browser
-Open your browser and visit:
-`http://<YOUR_ELASTIC_IP>`
-*(Example: `http://13.127.45.101`)*
-
-THE CLOUDTWIN PLATFORM IS NOW FULLY LIVE ON THE PUBLIC INTERNET!
+1. In EC2 Console -> Left menu -> "Elastic IPs" (under Network & Security).
+2. Click "Allocate Elastic IP address" -> Click "Allocate".
+3. Select the allocated IP -> Click "Actions" -> "Associate Elastic IP address".
+4. Resource type: `Instance` -> Select `CloudTwin-Production` -> Click "Associate".
+5. Note the Elastic IP address (e.g., `13.127.253.31`).
 
 
 ================================================================================
-10. STEP 8: HTTPS & FREE LET'S ENCRYPT SSL SETUP (cloudtwin.duckdns.org)
+10. STEP 8: FREE LET'S ENCRYPT SSL & DUCKDNS SETUP (HTTPS SECURITY)
 ================================================================================
 
-CloudTwin includes automated Let's Encrypt SSL provisioning and Nginx TLS 1.3
-configuration for `cloudtwin.duckdns.org` (or any custom domain).
+1. Visit https://www.duckdns.org (Sign in with GitHub/Google).
+2. Create subdomain: `cloudtwin` (Full domain: `cloudtwin.duckdns.org`).
+3. Set the IP address to your EC2 Elastic IP: `13.127.253.31` -> Click "update ip".
+4. Confirm Port 443 (HTTPS) is open in your EC2 Security Group `cloudtwin-ec2-sg`.
+5. Run the automated SSL setup script on EC2:
 
-Step 8.1: Point DuckDNS Subdomain to EC2 IP
-1. Log in to https://www.duckdns.org (Sign in with Google / GitHub).
-2. Under "sub domains", type: `cloudtwin` (so the domain is `cloudtwin.duckdns.org`).
-3. Set the IP address to your EC2 Public IP: `13.127.253.31`
-4. Click "update ip".
+```bash
+cd ~/CloudTwin
+git pull origin main
+chmod +x infrastructure/deployment/setup-ssl.sh
+./infrastructure/deployment/setup-ssl.sh cloudtwin.duckdns.org santanub957@gmail.com
+```
 
-Step 8.2: Ensure Port 443 (HTTPS) is Open in AWS EC2 Security Group
-1. Open EC2 Console -> Instances -> Click `CloudTwin-Production`.
-2. Click the "Security" tab -> Click your Security Group (e.g. `launch-wizard-1` or `cloudtwin-ec2-sg`).
-3. In "Inbound rules", confirm:
-   - Port 80 (HTTP) -> 0.0.0.0/0
-   - Port 443 (HTTPS) -> 0.0.0.0/0
-   - Port 22 (SSH) -> 0.0.0.0/0 (or your IP)
-   *(If Port 443 is missing, click "Edit inbound rules" -> "Add rule" -> Type: HTTPS -> Source: Anywhere-IPv4 -> Save).*
+Your platform is now live and fully secured at:
+https://cloudtwin.duckdns.org/
 
-Step 8.3: Run Automated SSL Setup Script on EC2
-In your EC2 terminal, run:
+
+================================================================================
+11. STEP 9: REAL-WORLD OBSTACLES FACED & EXACT TROUBLESHOOTING SOLUTIONS
+================================================================================
+
+During testing and deployment, several edge cases were identified and resolved.
+Reference these proven solutions whenever modifying the platform:
+
+--------------------------------------------------------------------------------
+Obstacle 1: Git Merge Conflicts During EC2 Code Pulls
+--------------------------------------------------------------------------------
+Symptom:
+  `error: Your local changes to the following files would be overwritten by merge:`
+  `  infrastructure/docker/docker-compose.prod.yml`
+  `  infrastructure/docker/nginx.conf`
+Cause:
+  Local modifications or automated scripts touched configuration files directly on EC2.
+Resolution:
+  Discard or stash local changes before pulling the clean repository:
+  ```bash
+  git stash
+  git pull origin main
+  ```
+
+--------------------------------------------------------------------------------
+Obstacle 2: 502 Bad Gateway on Simulation Engine & Timeout Tuning
+--------------------------------------------------------------------------------
+Symptom:
+  Running heavy simulations (e.g., 10x traffic surge or failover calculations)
+  returned HTTP `502 Bad Gateway` after exactly 60 seconds.
+Cause:
+  Nginx default `proxy_read_timeout` is 60 seconds. Complex Monte Carlo
+  and bottleneck simulations take longer than 60s, causing Nginx to drop the proxy socket.
+Resolution:
+  Tuned proxy timeouts to 300 seconds in `infrastructure/docker/nginx.conf`:
+  ```nginx
+  location /api/ {
+      proxy_pass http://backend:8000/api/;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_connect_timeout 300s;
+      proxy_send_timeout 300s;
+      proxy_read_timeout 300s;
+  }
+  ```
+
+--------------------------------------------------------------------------------
+Obstacle 3: Python Adapter NameError & Bottleneck Attribute Bugs
+--------------------------------------------------------------------------------
+Symptom:
+  FastAPI server crashed with 500 error when invoking `/simulations/run` or recommendations.
+Cause:
+  1. `backend/integrations/simulation_engine/adapter.py` referenced an unbound variable `custom_params`.
+  2. `backend/integrations/recommendation_engine/adapter.py` accessed `b.resource_name`
+     instead of `b.component_id`.
+Resolution:
+  1. Safely extracted params: `custom_params = scenario_config.get('custom_params', {})`.
+  2. Updated attribute resolution to safely fall back between `component_id` and `resource_id`.
+
+--------------------------------------------------------------------------------
+Obstacle 4: Browser Insecure Blob Warnings & Mixed Content
+--------------------------------------------------------------------------------
+Symptom:
+  Browser console reported:
+  `The file at 'blob:http://...' was loaded over an insecure connection. This file should be served over HTTPS.`
+Cause:
+  PDF report generation and canvas export blobs were created under HTTP origin.
+Resolution:
+  Enforced complete HTTPS via DuckDNS + Certbot TLS 1.3 configuration,
+  eliminating mixed-content security blocks.
+
+--------------------------------------------------------------------------------
+Obstacle 5: Dashboard Reload Bug (Resetting to Landing Page)
+--------------------------------------------------------------------------------
+Symptom:
+  Pressing `F5` or `Ctrl + R` anywhere in the dashboard or canvas redirected
+  the user back to the public landing page, losing the active tab state.
+Cause:
+  `inStudio` and `activeTab` states in `frontend/src/app/page.tsx` were initialized
+  to hardcoded default values (`false`, `'overview'`) without inspecting session storage.
+Resolution:
+  1. Initialized `inStudio` from `localStorage.getItem('cloudtwin_in_studio')` and token check.
+  2. Initialized `activeTab` from `window.location.hash` and `localStorage.getItem('cloudtwin_active_tab')`.
+  3. Hash routing updates the URL bar with `#simulator`, `#cost`, `#security`, `#architectures`.
+  4. Added explicit `handleReturnToLanding()` so returning to the landing page only occurs
+     when the user deliberately clicks "Showcase Landing".
+
+--------------------------------------------------------------------------------
+Obstacle 6: Real-Time Auto-Sync Across Canvas & Telemetry Tabs
+--------------------------------------------------------------------------------
+Symptom:
+  Changing node configs, adding resources, or switching currency did not update
+  Cost Intelligence, Security Posture, or Recommendations without refreshing the page.
+Resolution:
+  1. Added a 1.5-second debounced auto-save hook in `ArchitectureCanvas.tsx`
+     that tracks modifications and auto-persists updates to the backend.
+  2. Added a live toolbar indicator: `🟡 Auto-Syncing...` ➔ `🟢 Live Synced` ➔ `Auto-Sync Active`.
+  3. Added `syncTelemetry` in `page.tsx` that re-queries cost estimation, security audits,
+     and recommendations concurrently, ensuring all panels stay synchronized live.
+
+
+================================================================================
+12. STEP 10: COMPLETE TEARDOWN & BILLING PROTECTION (STOP VS. DELETE)
+================================================================================
+
+To avoid unintended AWS charges when you are done testing, use the appropriate teardown procedure:
+
+--------------------------------------------------------------------------------
+PROCEDURE A: TEMPORARILY STOP (PAUSE BILLING, PRESERVE ALL WORK)
+--------------------------------------------------------------------------------
+1. In EC2 Terminal:
+   ```bash
+   cd ~/CloudTwin
+   docker compose -f infrastructure/docker/docker-compose.prod.yml down
+   sudo shutdown -h now
+   ```
+2. In AWS RDS Console -> Databases -> Select `cloudtwin-rds-postgres` -> Actions -> "Stop".
+3. In AWS EC2 Console -> Elastic IPs -> Disassociate and Release Elastic IP
+   *(Crucial: AWS charges $0.005/hr for idle Elastic IPs left allocated!)*
+4. Cost while stopped: **$0 compute charges** (only pennies for dormant storage).
+
+--------------------------------------------------------------------------------
+PROCEDURE B: COMPLETE TEARDOWN / PERMANENT DELETION ($0.00 COST FOREVER)
+--------------------------------------------------------------------------------
+1. EC2: Select `CloudTwin-Production` -> Instance state -> **Terminate instance**.
+   (Automatically terminates server and deletes 30 GB EBS disk).
+2. Elastic IP: Select IP -> Actions -> **Disassociate** -> **Release Elastic IP address**.
+3. RDS: Select `cloudtwin-rds-postgres` -> Actions -> **Delete**:
+   - Uncheck "Create final snapshot".
+   - Check "Acknowledge deletion".
+   - Uncheck "Retain automated backups".
+   - Type `delete me` -> Click Delete.
+4. DynamoDB: Select `CloudTwinSimulationEvents` -> Click **Delete** -> Type `confirm` -> Delete.
+5. S3 Buckets:
+   - For `cloudtwin-architecture-vault-...` and `cloudtwin-reports-vault-...`:
+   - Click **Empty** -> Type `permanently delete` -> Empty.
+   - Click **Delete** -> Type bucket name -> Delete bucket.
+6. VPC Security Groups: Delete `cloudtwin-ec2-sg` and `cloudtwin-db-sg`.
+
+
+================================================================================
+13. PRODUCTION MAINTENANCE & ZERO-DOWNTIME UPDATE COMMANDS
+================================================================================
+
+When you push code updates to GitHub `main`, deploy to EC2 with zero hassle:
+
 ```bash
 # 1. Pull latest code
 cd ~/CloudTwin
+git stash
 git pull origin main
 
-# 2. Make script executable and run with your domain & email
-chmod +x infrastructure/deployment/setup-ssl.sh
-./infrastructure/deployment/setup-ssl.sh cloudtwin.duckdns.org your-email@gmail.com
-```
-
-Step 8.4: Verification
-Open your browser and visit:
-https://cloudtwin.duckdns.org/
-
-All browser insecure blob warnings are completely eliminated, and CloudTwin
-is secured with modern TLS 1.3 encryption!
-
-
-================================================================================
-11. STEP 9: END-TO-END VERIFICATION, SMOKE TESTING & CLOUD TWIN AUDIT
-================================================================================
-
-Test each CloudTwin feature from your web browser to ensure complete integration:
-
-1. Interactive Architecture Canvas:
-   - Visit: `http://<YOUR_ELASTIC_IP>`
-   - Drag and drop AWS nodes (ALB, EC2, Lambda, RDS, S3, DynamoDB) onto the canvas.
-   - Connect ALB -> EC2 -> RDS. Confirm connection handles snap cleanly.
-
-2. Swagger Interactive API Documentation:
-   - Visit: `http://<YOUR_ELASTIC_IP>/docs`
-   - Test `GET /api/projects` -> Confirm HTTP 200 OK.
-   - Test `GET /api/health` -> Confirm all engines return `online`.
-
-3. Live RDS PostgreSQL Persistence:
-   - In the CloudTwin UI, create a new project named "Production AWS Twin".
-   - Refresh the page -> Confirm the project loads from RDS PostgreSQL (`users`, `projects`).
-
-4. Live S3 Vault Snapshot Export:
-   - Click "Save Architecture" -> Confirm JSON snapshot uploads to `cloudtwin-architecture-vault-santanu-8831`.
-   - Click "Export PDF Report" -> Confirm PDF report saves into `cloudtwin-reports-vault-santanu-8831`.
-
-5. Live DynamoDB Real-Time Telemetry Stream:
-   - Go to the "What-If Simulation" panel.
-   - Select Scenario: "Traffic Surge (10x Spike)".
-   - Click "Run Simulation".
-   - Confirm real-time bottleneck metrics stream into `CloudTwinSimulationEvents`.
-
-
-================================================================================
-12. STEP 10: PRODUCTION MONITORING, LINUX SWAP & MAINTENANCE COMMANDS
-================================================================================
-
-Helpful operational commands to manage your production EC2 server:
-
---------------------------------------------------------------------------------
-A. View Live Logs
---------------------------------------------------------------------------------
-- View logs of all services:
-  ```bash
-  docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f
-  ```
-- View backend API logs only:
-  ```bash
-  docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f backend
-  ```
-- View Nginx web access & error logs:
-  ```bash
-  docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f nginx
-  ```
-
---------------------------------------------------------------------------------
-B. Restart or Stop Services
---------------------------------------------------------------------------------
-- Restart all services:
-  ```bash
-  docker compose -f infrastructure/docker/docker-compose.prod.yml restart
-  ```
-- Stop all services:
-  ```bash
-  docker compose -f infrastructure/docker/docker-compose.prod.yml down
-  ```
-
---------------------------------------------------------------------------------
-C. Deploying Code Updates (Zero Downtime)
---------------------------------------------------------------------------------
-When you push code changes to GitHub, pull and re-deploy on EC2 with:
-```bash
-cd ~/CloudTwin
-git pull origin main
+# 2. Rebuild and restart services
 docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+
+# 3. View live backend logs
+docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f backend
+
+# 4. View live Nginx logs
+docker compose -f infrastructure/docker/docker-compose.prod.yml logs -f nginx
 ```
 
---------------------------------------------------------------------------------
-D. Allocate Linux Swap Memory (Recommended for t3.micro/t3.small)
---------------------------------------------------------------------------------
-If building on an instance with under 4 GB RAM, allocate a 2 GB Swap file to 
-prevent out-of-memory errors during Docker compilation:
+If building on a low-memory instance (t3.micro or t3.small), allocate a 2GB Linux Swapfile:
 ```bash
 sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
@@ -568,15 +470,6 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 free -h
 ```
 
---------------------------------------------------------------------------------
-E. Check Disk & Memory Usage
---------------------------------------------------------------------------------
-```bash
-free -m
-df -h
-docker system df
-```
-
 ================================================================================
-END OF CLOUDTWIN PRODUCTION AWS EC2 & DOCKER DEPLOYMENT MASTER ACTION GUIDE
+END OF CLOUDTWIN PRODUCTION AWS EC2 & DOCKER DEPLOYMENT MASTER ACTION GUIDE (v2.0)
 ================================================================================
