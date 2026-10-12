@@ -1,0 +1,41 @@
+{
+  "TableName": "cloudtwin_architectures",
+  "KeySchema": [
+    {
+      "AttributeName": "project_id",
+      "KeyType": "HASH"
+    },
+    {
+      "AttributeName": "architecture_id",
+      "KeyType": "RANGE"
+    }
+  ],
+  "AttributeDefinitions": [
+    {
+      "AttributeName": "project_id",
+      "AttributeType": "S"
+    },
+    {
+      "AttributeName": "architecture_id",
+      "AttributeType": "S"
+    }
+  ],
+  "BillingMode": "PAY_PER_REQUEST",
+  "SSESpecification": {
+    "Enabled": true,
+    "SSEType": "KMS"
+  },
+  "PointInTimeRecoverySpecification": {
+    "PointInTimeRecoveryEnabled": true
+  },
+  "Tags": [
+    {
+      "Key": "Project",
+      "Value": "CloudTwin"
+    },
+    {
+      "Key": "Environment",
+      "Value": "Production"
+    }
+  ]
+}

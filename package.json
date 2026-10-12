@@ -1,0 +1,22 @@
+{
+  "name": "cloudtwin",
+  "version": "1.0.0",
+  "description": "CloudTwin — AI-Powered Digital Twin & What-If Simulation Platform for AWS Cloud Architectures",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "test": "pytest backend/tests/ -v"
+  },
+  "keywords": [
+    "cloudtwin",
+    "aws",
+    "digital-twin",
+    "fastapi",
+    "nextjs"
+  ],
+  "author": "CloudTwin Team",
+  "license": "Apache-2.0"
+}

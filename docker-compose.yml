@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEMO_MODE=true
+      - PORT=8000
+      - DATABASE_URL=postgresql://cloudtwin:cloudtwin_pass_2026@postgres:5432/cloudtwin
+      - JWT_SECRET_KEY=cloudtwin-super-secure-jwt-secret-key-prod-2026
+      - AWS_S3_BUCKET=cloudtwin-architecture-vault
+      - AWS_DEFAULT_REGION=ap-south-1
+      - AWS_MOCK_MODE=true
+    volumes:
+      - ./backend:/app/backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudtwin-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=cloudtwin
+      - POSTGRES_PASSWORD=cloudtwin_pass_2026
+      - POSTGRES_DB=cloudtwin
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
