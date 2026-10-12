@@ -13,6 +13,7 @@ report_router = APIRouter(prefix="/reports", tags=["Reports"])
 
 router_health = APIRouter(prefix="/health", tags=["Health & Status"])
 @router_health.get("")
+@router_health.get("/")
 async def system_health():
     return success_response({
         "status": "healthy",
