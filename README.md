@@ -17,13 +17,16 @@ CloudTwin allows cloud architects and DevOps engineers to visually model AWS arc
 
 ---
 
-## Ownership & Architecture Division
+## Ownership & 6-Member Engineering Team Division
 
-| Role | Module | Ownership |
+| Role | Engineering Domain | Ownership & Modules |
 | :--- | :--- | :--- |
-| **Member 1 (Santanu) — Full-Stack & Integration Lead** *(This Codebase)* | **Frontend + Core Backend + AWS DB/Storage + DevOps** | Next.js 14 App, FastAPI Orchestration, AWS RDS/DynamoDB, Amazon S3 Vault, System Integration, Docker, CI/CD |
-| **Member 2** | **Simulation Engine** | AWS Architecture Behavioral Modeling, Fault Injection, Queue/Latency Algorithms |
-| **Member 3** | **Cost + Security + AI Engine** | AWS Cost Calculator, CIS Security Scanner, AI Topology Advisor |
+| **Member 1: Santanu** *(Lead)* | **Full-Stack Platform & Core Orchestrator** | Next.js 14 App Router, React Flow Interactive Canvas, FastAPI Orchestration Core, Canonical Schema Contract, LocalStorage & Hash State Persistence, API Gateway & Cross-Engine Bridge |
+| **Member 2** | **Simulation & Behavioral Modeling** | AWS Behavioral Modeling, Monte Carlo Failure Injection, 10× Traffic Surge Modeling, Multi-AZ Outage Scenarios, Latency & Queue Dynamics |
+| **Member 3** | **Cloud FinOps & Cost Intelligence** | AWS Pricing API Integration ($ and ₹), Granular Service-Level Cost Projections, Baseline vs. Simulated Cost Deltas, AWS Pricing Calculator Alignment |
+| **Member 4** | **Cloud Security & Compliance** | CIS AWS Foundations Benchmark v1.4.0 Scanner, AWS Security Hub Mapping, Zero-Trust Ingress Audits, IAM Least-Privilege & Port Risk Scoring |
+| **Member 5** | **AI Cloud Architect & Topology Advisor** | Google Gemini AI / LLM Integration, Automated Architecture Topology Diff Generator (`suggested_topology_diff`), Root Cause Failure Mitigation, Well-Architected Recommendations |
+| **Member 6** | **Cloud Infrastructure, DevOps & SRE** | Dual-AZ AWS VPC & Subnets, Security Group Chaining, AWS RDS PostgreSQL Schema, Amazon DynamoDB Streams, S3 Vaults, Docker Compose Multi-Container Stack, Nginx TLS 1.3 & SSL Automation, Zero-Cost Teardown Governance |
 
 ---
 

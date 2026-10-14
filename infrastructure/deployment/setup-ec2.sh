@@ -35,7 +35,7 @@ docker compose version
 echo "=== 4. Starting CloudTwin Containers ==="
 # Run from repository root
 if [ -f "infrastructure/docker/docker-compose.prod.yml" ]; then
-    docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+    sudo docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
     echo "CloudTwin successfully started on port 80!"
 else
     echo "Warning: Run this script from the CloudTwin root directory."

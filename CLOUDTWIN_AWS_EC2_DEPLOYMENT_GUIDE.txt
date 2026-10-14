@@ -100,8 +100,9 @@ are prepared before deploying:
 | DYNAMODB_TABLE_SIMULATIONS | CloudTwinSimulationEvents                                   | Active (Billing: Pay-Per-Request)  |
 | AWS_ACCESS_KEY_ID          | <YOUR_AWS_ACCESS_KEY_ID>                                    | IAM User Access Key                |
 | AWS_SECRET_ACCESS_KEY      | <YOUR_AWS_SECRET_ACCESS_KEY>                                | IAM User Secret Key                |
-| RDS Security Group ID      | sg-084e49d942e94aa18 (`cloudtwin-db-sg`)                    | Controls Port 5432 ingress         |
-| VPC ID                     | vpc-0c3713a08b16e7c10 (`cloudtwin-vpc`)                     | Main CloudTwin Production VPC      |
+| RDS Security Group ID      | sg-07c79b2d640b356d6 (`cloudtwin-db-sg`)                    | Controls Port 5432 ingress         |
+| EC2 Security Group ID      | sg-06af867410f02bce2 (`cloudtwin-ec2-sg`)                   | Controls App & Web ingress         |
+| VPC ID                     | vpc-0677b15b322394866 (`cloudtwin-vpc`)                    | Main CloudTwin Production VPC      |
 | DuckDNS Domain             | cloudtwin.duckdns.org                                       | Free HTTPS Subdomain               |
 +----------------------------+-------------------------------------------------------------+------------------------------------+
 

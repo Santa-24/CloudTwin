@@ -17,15 +17,21 @@ class DatabaseService:
     def __init__(self):
         self.db_url = settings.DATABASE_URL
         self._conn = None
+        self._is_available = True
 
     def get_connection(self):
+        if not self._is_available:
+            return None
         try:
-            return psycopg2.connect(
+            conn = psycopg2.connect(
                 self.db_url,
-                connect_timeout=5
+                connect_timeout=3
             )
+            self._is_available = True
+            return conn
         except Exception as e:
             logger.warning(f"Failed to connect to RDS PostgreSQL: {e}")
+            self._is_available = False
             return None
 
     def init_database(self):
