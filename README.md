@@ -1,80 +1,263 @@
-# CloudTwin
+<div align="center">
 
-> **AI-Powered Digital Twin & What-If Simulation Platform for AWS Cloud Architectures**
+# ☁️ CloudTwin
 
-[![CI/CD Pipeline](https://github.com/CloudTwin/cloudtwin/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/CloudTwin/cloudtwin/actions/workflows/ci-cd.yml)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2014-black?logo=next.js)](https://nextjs.org)
-[![AWS RDS](https://img.shields.io/badge/Database-AWS%20RDS%20Postgres-527FFF?logo=amazonrds)](https://aws.amazon.com/rds/)
-[![Amazon S3](https://img.shields.io/badge/Storage-Amazon%20S3-569A31?logo=amazons3)](https://aws.amazon.com/s3/)
+**AI-powered digital twin & what-if simulation platform for AWS architectures.**
+Model it. Break it. Price it. Secure it. Fix it — *before* it hits production.
+
+[![CI/CD](https://github.com/Santa-24/CloudTwin/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Santa-24/CloudTwin/actions/workflows/ci-cd.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Frontend-Next.js%2014-black?logo=nextdotjs)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-RDS%20%7C%20S3%20%7C%20DynamoDB-FF9900?logo=amazonaws&logoColor=white)
+
+[Features](#-features) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [Testing](#-testing) · [Deployment](#-deployment) · [Docs](#-documentation) · [Team](#-team)
+
+<!-- 📸 Add a hero screenshot or demo GIF here: docs/assets/demo.gif -->
+<!-- <img src="docs/assets/demo.gif" alt="CloudTwin demo" width="90%"> -->
+
+</div>
 
 ---
 
-## Overview
+## 🎯 What is CloudTwin?
 
-CloudTwin allows cloud architects and DevOps engineers to visually model AWS architectures across 11 core AWS services (EC2, S3, RDS, Lambda, API Gateway, CloudFront, ALB, VPC, NAT Gateway, DynamoDB, ECS), stress-test them with real-world what-if simulations (e.g. 10× traffic surge, Availability Zone outages, node crashes), analyze cloud costs down to the service level ($ and ₹), audit against CIS AWS security benchmarks, and receive architectural recommendations with topology diffs before deploying to production.
+Changing cloud infrastructure is risky, and cost or security surprises usually show up only after deployment. **CloudTwin** lets cloud architects and DevOps engineers draw an AWS architecture on an interactive canvas, then stress-test it virtually:
 
----
+- 💥 **Simulate** traffic surges, Availability Zone outages, and node crashes
+- 💸 **Analyze** costs per service in both **USD ($)** and **INR (₹)**
+- 🛡️ **Audit** the design against **CIS AWS Foundations Benchmark** controls
+- 🤖 **Get AI recommendations** with a concrete **topology diff** showing what to change
 
-## Ownership & 6-Member Engineering Team Division
-
-| Role | Engineering Domain | Ownership & Modules |
-| :--- | :--- | :--- |
-| **Member 1: Santanu** *(Lead)* | **Full-Stack Platform & Core Orchestrator** | Next.js 14 App Router, React Flow Interactive Canvas, FastAPI Orchestration Core, Canonical Schema Contract, LocalStorage & Hash State Persistence, API Gateway & Cross-Engine Bridge |
-| **Member 2** | **Simulation & Behavioral Modeling** | AWS Behavioral Modeling, Monte Carlo Failure Injection, 10× Traffic Surge Modeling, Multi-AZ Outage Scenarios, Latency & Queue Dynamics |
-| **Member 3** | **Cloud FinOps & Cost Intelligence** | AWS Pricing API Integration ($ and ₹), Granular Service-Level Cost Projections, Baseline vs. Simulated Cost Deltas, AWS Pricing Calculator Alignment |
-| **Member 4** | **Cloud Security & Compliance** | CIS AWS Foundations Benchmark v1.4.0 Scanner, AWS Security Hub Mapping, Zero-Trust Ingress Audits, IAM Least-Privilege & Port Risk Scoring |
-| **Member 5** | **AI Cloud Architect & Topology Advisor** | Google Gemini AI / LLM Integration, Automated Architecture Topology Diff Generator (`suggested_topology_diff`), Root Cause Failure Mitigation, Well-Architected Recommendations |
-| **Member 6** | **Cloud Infrastructure, DevOps & SRE** | Dual-AZ AWS VPC & Subnets, Security Group Chaining, AWS RDS PostgreSQL Schema, Amazon DynamoDB Streams, S3 Vaults, Docker Compose Multi-Container Stack, Nginx TLS 1.3 & SSL Automation, Zero-Cost Teardown Governance |
+All of it runs against a model of your design, so nothing touches real infrastructure.
 
 ---
 
-## Tech Stack
+## ✨ Features
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, React Flow (`@xyflow/react`), Framer Motion, Lucide Icons, Recharts
-- **Backend**: Python 3.11+, FastAPI, Pydantic v2, Pytest, HTTPX, PyJWT, Boto3, SQLAlchemy
-- **Database & Storage**: AWS RDS PostgreSQL / Amazon Aurora & Amazon DynamoDB, Amazon S3 for Architecture & Report Vaults
-- **DevOps**: Docker, Docker Compose, GitHub Actions CI/CD
+| | Capability | Details |
+|---|---|---|
+| 🎨 | **Visual architecture builder** | Drag-and-drop canvas built on React Flow. State persists via LocalStorage and URL hash. |
+| 🧱 | **11 supported AWS services** | EC2, S3, RDS, Lambda, API Gateway, CloudFront, ALB, VPC, NAT Gateway, DynamoDB, ECS |
+| 💥 | **What-if simulation** | Monte Carlo failure injection, 10× traffic surge, multi-AZ outage, latency and queue dynamics |
+| 💸 | **FinOps cost intelligence** | Service-level cost projections, baseline vs. simulated cost deltas, aligned with AWS Pricing Calculator |
+| 🛡️ | **Security & compliance** | CIS AWS Foundations v1.4.0 scanner, Security Hub mapping, zero-trust ingress audit, IAM and port risk scoring |
+| 🤖 | **AI cloud architect** | Google Gemini-powered root-cause analysis and Well-Architected recommendations, with a machine-readable `suggested_topology_diff` |
 
 ---
 
-## Quick Start (Local Development)
+## 🏗️ Architecture
 
-### 1. Start Backend
+```
+┌─────────────────────────┐        ┌──────────────────────────────────────┐
+│  Frontend (Next.js 14)  │  REST  │        Backend (FastAPI)             │
+│  React Flow canvas      │◄──────►│  Orchestrator + canonical schema     │
+│  Recharts dashboards    │        │                                      │
+└─────────────────────────┘        │  ┌────────────┐  ┌────────────────┐  │
+                                   │  │ Simulation │  │ Cost (FinOps)  │  │
+                                   │  └────────────┘  └────────────────┘  │
+                                   │  ┌────────────┐  ┌────────────────┐  │
+                                   │  │  Security  │  │ AI Advisor     │  │
+                                   │  │  (CIS)     │  │ (Gemini)       │  │
+                                   │  └────────────┘  └────────────────┘  │
+                                   └───────────────┬──────────────────────┘
+                                                   │
+                         ┌─────────────────────────┼───────────────────────┐
+                         ▼                         ▼                       ▼
+                  AWS RDS PostgreSQL         Amazon DynamoDB          Amazon S3
+                  (core data)                (simulation telemetry)   (architecture &
+                                                                       report vaults)
+```
+
+### Tech stack
+
+| Layer | Technologies |
+|---|---|
+| **Frontend** | Next.js 14 (App Router), TypeScript, Tailwind CSS, React Flow (`@xyflow/react`), Framer Motion, Recharts, Lucide Icons |
+| **Backend** | Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy, Boto3, PyJWT, HTTPX, Pytest |
+| **Data** | AWS RDS PostgreSQL / Aurora, Amazon DynamoDB, Amazon S3 |
+| **DevOps** | Docker, Docker Compose, Nginx (TLS 1.3), GitHub Actions |
+
+---
+
+## 📁 Project Structure
+
+```
+CloudTwin/
+├── backend/            # FastAPI app, simulation / cost / security / AI engines, tests
+├── frontend/           # Next.js 14 app (canvas, dashboards)
+├── database/aws_rds/   # PostgreSQL DDL + DynamoDB schema
+├── infrastructure/     # AWS infrastructure definitions (VPC, subnets, SGs, etc.)
+├── docs/               # Additional documentation
+├── .github/workflows/  # CI/CD pipeline
+├── docker-compose.yml  # Multi-container stack
+├── .env.example        # Environment variable template
+└── start.bat / start.ps1   # One-click Windows launchers
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python **3.11+**
+- Node.js **18+** and npm
+- Docker & Docker Compose *(optional, for the containerized stack)*
+- AWS credentials and a Gemini API key *(only needed for live AWS and AI features)*
+
+### 1. Clone and configure
+
 ```bash
-# In project root
+git clone https://github.com/Santa-24/CloudTwin.git
+cd CloudTwin
+cp .env.example .env      # then fill in your values
+```
+
+> ⚠️ Never commit `.env`. It is already covered by `.gitignore`.
+
+### 2. Choose how to run
+
+<details open>
+<summary><b>Option A: Docker Compose (recommended)</b></summary>
+
+```bash
+docker-compose up --build
+```
+
+</details>
+
+<details>
+<summary><b>Option B: Run services manually</b></summary>
+
+**Backend**
+
+```bash
 python -m pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload --port 8000
 ```
-Backend API will be running at `http://localhost:8000` with Swagger docs at `http://localhost:8000/docs`.
 
-### 2. Start Frontend
+**Frontend** (new terminal)
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Frontend application will be live at `http://localhost:3000`.
 
-### 3. Run with Docker Compose
-```bash
-docker-compose up --build
+</details>
+
+<details>
+<summary><b>Option C: Windows one-click</b></summary>
+
+```powershell
+.\start.bat     # or: .\start.ps1
 ```
+
+</details>
+
+### 3. Open the app
+
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Swagger / OpenAPI docs | http://localhost:8000/docs |
 
 ---
 
-## Running Test Suite
+## 🧪 Testing
 
 ```bash
 python -m pytest backend/tests/ -v
 ```
 
+Tests also run automatically on every push through GitHub Actions.
+
 ---
 
-## Database Schemas (AWS RDS & DynamoDB)
+## 🗄️ Database & Storage
 
-All schema definitions are located in `database/aws_rds/`:
-- `001_rds_postgres_schema.sql`: Core AWS RDS / Aurora PostgreSQL DDL, foreign keys, and indexes
-- `002_dynamodb_schema.json`: Amazon DynamoDB schema definition and GSI for simulation telemetry
-- S3 Buckets: `cloudtwin-architecture-vault` and `cloudtwin-reports-vault` for architecture states and audit exports
+Schemas live in [`database/aws_rds/`](database/aws_rds):
+
+| File / Resource | Purpose |
+|---|---|
+| `001_rds_postgres_schema.sql` | Core RDS / Aurora PostgreSQL DDL, foreign keys, indexes |
+| `002_dynamodb_schema.json` | DynamoDB table and GSI for simulation telemetry |
+| `cloudtwin-architecture-vault` (S3) | Saved architecture states |
+| `cloudtwin-reports-vault` (S3) | Exported audit and cost reports |
+
+---
+
+## ☁️ Deployment
+
+A full AWS EC2 walkthrough is in [`CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt`](CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt). The target deployment includes:
+
+- Dual-AZ VPC with chained security groups
+- RDS PostgreSQL and DynamoDB for persistence
+- Nginx reverse proxy with TLS 1.3
+- Docker Compose multi-container stack
+- Zero-cost teardown governance to avoid idle AWS spend
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|---|---|
+| [Master Architecture & Defense Guide](CLOUDTWIN_MASTER_ARCHITECTURE_AND_DEFENSE_GUIDE.md) | Deep dive into design decisions and trade-offs |
+| [AWS EC2 Deployment Guide](CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt) | Step-by-step production deployment |
+| [Team Handoff (Members 2 & 3)](CLOUDTWIN_TEAM_HANDOFF_MEMBER2_MEMBER3.txt) | Integration contract for simulation and cost engines |
+| [`docs/`](docs) | Additional guides |
+
+---
+
+## 👥 Team
+
+| Member | Domain | Ownership |
+|---|---|---|
+| **Santanu** *(Lead)* | Full-stack platform & orchestration | Next.js 14 app, React Flow canvas, FastAPI core, canonical schema contract, state persistence, cross-engine bridge |
+| **Member 2** | Simulation & behavioral modeling | AWS behavior models, Monte Carlo failure injection, traffic surge and multi-AZ outage scenarios |
+| **Member 3** | Cloud FinOps | AWS Pricing API integration ($ / ₹), service-level cost projections, cost deltas |
+| **Member 4** | Security & compliance | CIS v1.4.0 scanner, Security Hub mapping, zero-trust ingress audit, IAM and port risk scoring |
+| **Member 5** | AI architect & advisor | Gemini integration, `suggested_topology_diff` generator, root-cause mitigation |
+| **Member 6** | Infrastructure, DevOps & SRE | VPC and subnets, RDS / DynamoDB / S3, Docker Compose, Nginx TLS, teardown governance |
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Support for additional AWS services
+- [ ] Import existing architectures from Terraform / CloudFormation
+- [ ] Exportable PDF reports for cost and compliance results
+- [ ] Multi-user workspaces and shareable simulations
+
+*(Edit this list to match your real plans.)*
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome.
+
+1. Fork the repo and create a branch: `git checkout -b feat/your-feature`
+2. Make your changes and add tests
+3. Run `python -m pytest backend/tests/ -v`
+4. Open a pull request describing what and why
+
+---
+
+## 📄 License
+
+Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) for details.
+
+---
+
+<div align="center">
+
+If CloudTwin helps you, consider giving it a ⭐
+
+</div>
