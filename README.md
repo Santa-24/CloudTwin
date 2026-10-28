@@ -194,7 +194,7 @@ Schemas live in [`database/aws_rds/`](database/aws_rds):
 
 ## ☁️ Deployment
 
-A full AWS EC2 walkthrough is in [`CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt`](CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt). The target deployment includes:
+A full AWS EC2 walkthrough is in [`docs/AWS_DEPLOYMENT_GUIDE.md`](docs/AWS_DEPLOYMENT_GUIDE.md). The target deployment includes:
 
 - Dual-AZ VPC with chained security groups
 - RDS PostgreSQL and DynamoDB for persistence
@@ -208,10 +208,10 @@ A full AWS EC2 walkthrough is in [`CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt`](CLOU
 
 | Document | Description |
 |---|---|
-| [Master Architecture & Defense Guide](CLOUDTWIN_MASTER_ARCHITECTURE_AND_DEFENSE_GUIDE.md) | Deep dive into design decisions and trade-offs |
-| [AWS EC2 Deployment Guide](CLOUDTWIN_AWS_EC2_DEPLOYMENT_GUIDE.txt) | Step-by-step production deployment |
-| [Team Handoff (Members 2 & 3)](CLOUDTWIN_TEAM_HANDOFF_MEMBER2_MEMBER3.txt) | Integration contract for simulation and cost engines |
-| [`docs/`](docs) | Additional guides |
+| [System Architecture](docs/architecture.md) | Deep dive into system topology, services, and schemas |
+| [AWS Deployment Guide](docs/AWS_DEPLOYMENT_GUIDE.md) | Step-by-step production deployment on AWS EC2 & RDS |
+| [Engine Integration Guide](docs/integration.md) | Integration contracts for simulation, FinOps, and security engines |
+| [API Documentation](docs/api.md) | REST API endpoints and data models |
 
 ---
 
